@@ -1,8 +1,8 @@
 export default function Home() {
-    return (
-      <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-        <h1>Hallo Welt 🎉</h1>
-        <p>Dies ist ein einfacher Test, um zu sehen, ob Vercel alles richtig rendert.</p>
-      </div>
-    );
-  }
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
+      <h1>Test erfolgreich 🎉</h1>
+      <p>Wenn du das hier siehst, funktioniert Routing & Build korrekt.</p>
+    </div>
+  );
+}
