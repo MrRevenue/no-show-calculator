@@ -270,6 +270,14 @@ export default function Home() {
             <h2 className="text-2xl font-bold text-center mb-6">Dein Ergebnis</h2>
 
             <div className="grid gap-4 sm:grid-cols-2">
+            <div className="bg-white shadow-lg rounded-xl p-4">
+                <h3 className="text-sm text-gray-500">Deine No-Show-Rate</h3>
+                <p className="text-xl font-semibold">{noShowRate}%</p>
+              </div>  
+              <div className="bg-white shadow-lg rounded-xl p-4">
+                <h3 className="text-sm text-gray-500">Umsatzverlust durch No-Shows</h3>
+                <p className="text-xl font-semibold">{calculateLoss().toFixed(2)} {currency}</p>
+              </div>            
               <div className="bg-white shadow-lg rounded-xl p-4">
                 <h3 className="text-sm text-gray-500">Ø Auslastung (30 Tage)</h3>
                 <p className="text-xl font-semibold">
@@ -277,17 +285,10 @@ export default function Home() {
                 </p>
               </div>
               <div className="bg-white shadow-lg rounded-xl p-4">
-                <h3 className="text-sm text-gray-500">Umsatzverlust durch No-Shows</h3>
-                <p className="text-xl font-semibold">{calculateLoss().toFixed(2)} {currency}</p>
-              </div>
-              <div className="bg-white shadow-lg rounded-xl p-4">
                 <h3 className="text-sm text-gray-500">Gesamtumsatz (30 Tage)</h3>
                 <p className="text-xl font-semibold">{totalRevenue.toFixed(2)} {currency}</p>
               </div>
-              <div className="bg-white shadow-lg rounded-xl p-4">
-                <h3 className="text-sm text-gray-500">No-Show-Rate</h3>
-                <p className="text-xl font-semibold">{noShowRate}%</p>
-              </div>
+
             </div>
 
             <h3 className="text-lg font-semibold mt-6">Dein Optimierungspotenzial</h3>
