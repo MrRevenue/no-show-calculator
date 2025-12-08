@@ -289,9 +289,15 @@ export default function NoShowCalculator() {
               {/* Value Bubble */}
               <div
                 className="absolute -top-4 text-xs font-semibold text-pink-600"
-                style={{
-                  left: `calc(${((avgGuestsSliderValue - 1) / (8 - 1)) * 100}% - 12px)`
-                }}
+                  style={{
+                    left: `calc(${((avgGuestsSliderValue - 1) / 7) * 100}% - ${
+                    avgGuestsSliderValue <= 1.5
+                    ? "4px"
+                    : avgGuestsSliderValue >= 7.5
+                    ? "20px"
+                    : "12px"
+                  })`
+              }}
               >
                 {avgGuestsSliderValue}
               </div>
