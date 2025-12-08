@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "15.3.1",
+    "next": "15.3.6",
     "nodemailer": "^7.0.3",
     "pdfkit": "^0.17.1",
     "react": "^19.0.0",
@@ -19,7 +19,7 @@
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
-    "eslint-config-next": "15.3.1",
+    "eslint-config-next": "15.3.6",
     "tailwindcss": "^4"
   }
 }
