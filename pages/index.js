@@ -30,7 +30,6 @@ export default function NoShowCalculator() {
   const [showPolicyError, setShowPolicyError] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState(null); // 'submitting' | 'success' | 'error' | null
   const [showForm, setShowForm] = useState(true);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const contactFormRef = useRef(null);
 
   useEffect(() => {
@@ -194,9 +193,10 @@ export default function NoShowCalculator() {
       {/* Schritt 1: Basisangaben */}
       {!showResult && step === 1 && (
         <>
-          <h2 className="text-xl font-bold mb-2">Grundlagen zu deinem Restaurant</h2>
+
+        <h2 className="text-2xl font-bold mb-2">Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
           <p className="text-sm text-gray-600 mb-4">
-            Beantworte kurz diese 5 Fragen – das reicht, um deinen No-Show-Schaden realistisch zu schätzen.
+            Beantworte kurz diese 5 Fragen – die Berechnung erfolgt sofort.
           </p>
 
           {renderField('guestsPerDay', 'Ø Gäste pro Öffnungstag (z. B. 80)', 'number')}
@@ -211,42 +211,6 @@ export default function NoShowCalculator() {
             'noShowGuestsLast30Days',
             'Wie viele Gäste sind in den letzten 30 Tagen nicht erschienen (No-Shows)?',
             'number'
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowAdvanced((prev) => !prev)}
-            className="mt-4 text-sm text-blue-600 underline"
-          >
-            {showAdvanced
-              ? 'Optionale Angaben ausblenden'
-              : 'Optionale Angaben anzeigen (Land, Typ, Sitzplätze)'}
-          </button>
-
-          {showAdvanced && (
-            <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-              <p className="text-xs text-gray-500 mb-2">
-                Diese Angaben helfen uns, die Auswertung noch genauer auf dein Restaurant zuzuschneiden.
-              </p>
-              {renderField('country', 'Land (optional)', 'text', [
-                '',
-                'Deutschland',
-                'Schweiz',
-                'Österreich',
-                'Italien'
-              ])}
-              {renderField('restaurantType', 'Restaurant-Typ (optional)', 'text', [
-                '',
-                'Fine Dining',
-                'Casual Dining',
-                'Bar / Pub',
-                'Café',
-                'Pop-up',
-                'Hotelrestaurant',
-                'Restaurant-Gruppe / -Kette'
-              ])}
-              {renderField('seats', 'Anzahl Sitzplätze (optional)', 'number')}
-            </div>
           )}
 
           <button
