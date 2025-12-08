@@ -156,12 +156,12 @@ export default function NoShowCalculator() {
   const seats = +formData.seats || 0;
 
   // Slider-Defaults für Darstellung
-  const avgGuestsSliderValue = formData.avgGuestsPerReservation
-    ? +formData.avgGuestsPerReservation
-    : 2.5;
-  const avgSpendSliderValue = formData.averageSpend
-    ? +formData.averageSpend
-    : 50;
+  const avgGuestsSliderValue = avgGuestsPerReservation || 2.5;
+  const avgSpendSliderValue = avgSpendPerGuest || 50;
+
+  // Prozentwerte für perfekte Bubble-Zentrierung
+  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (8 - 1)) * 100; // Range 1–8
+  const avgSpendPercent = ((avgSpendSliderValue - 10) / (200 - 10)) * 100; // Range 10–200
 
   // No-Show-Gebühr nur, wenn wirklich erhoben
   const noShowFeePerGuest =
@@ -189,15 +189,14 @@ export default function NoShowCalculator() {
   const recoveredByFees30 = noShowGuests30 * noShowFeePerGuest; // kompensiert durch Gebühren
   const loss30 = Math.max(grossLoss30 - recoveredByFees30, 0); // Nettoverlust
 
-  // Auslastung (optional, wenn Sitzplätze bekannt)
+  // Auslastung (optional, wenn Sitzplätze bekannt) – wird aktuell nicht angezeigt, aber berechnet
   let occupancy = null;
   if (seats > 0 && OPEN_DAYS_30 > 0) {
-    // Annahme: 1 Belegung pro Sitz und Öffnungstag
     const capacityGuests30 = seats * OPEN_DAYS_30;
     occupancy = capacityGuests30 > 0 ? (totalGuests30 / capacityGuests30) * 100 : null;
   }
 
-  // Upsell-Potenzial & grober ROI
+  // Upsell-Potenzial & grober ROI – nur für den PDF-Report relevant
   const upsell = totalRevenue30 * 0.05; // 5% zusätzlicher Umsatz
   const roi = Math.floor((loss30 + upsell) / 350); // grob bei 350 €/Monat Systemkosten
 
@@ -272,7 +271,7 @@ export default function NoShowCalculator() {
             restaurantTypeOptions
           )}
 
-          {/* 1. Struktur deines Betriebs */}
+          {/* 1. Ø Reservierungen pro Öffnungstag */}
           {renderField(
             'reservationsPerDay',
             'Ø Reservierungen pro Öffnungstag (z. B. 40)',
@@ -286,18 +285,13 @@ export default function NoShowCalculator() {
             </label>
 
             <div className="relative w-full">
-              {/* Value Bubble */}
+              {/* Value Bubble – perfekt zentriert über dem Knopf */}
               <div
-                className="absolute -top-4 text-xs font-semibold text-pink-600"
-                  style={{
-                    left: `calc(${((avgGuestsSliderValue - 1) / 7) * 100}% - ${
-                    avgGuestsSliderValue <= 1.5
-                    ? "4px"
-                    : avgGuestsSliderValue >= 7.5
-                    ? "20px"
-                    : "12px"
-                  })`
-              }}
+                className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
+                style={{
+                  left: `${avgGuestsPercent}%`,
+                  transform: 'translateX(-50%)'
+                }}
               >
                 {avgGuestsSliderValue}
               </div>
@@ -334,11 +328,12 @@ export default function NoShowCalculator() {
             </label>
 
             <div className="relative w-full">
-              {/* Value Bubble */}
+              {/* Value Bubble – perfekt zentriert */}
               <div
-                className="absolute -top-4 text-xs font-semibold text-pink-600"
+                className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
                 style={{
-                  left: `calc(${((avgSpendSliderValue - 10) / (200 - 10)) * 100}% - 12px)`
+                  left: `${avgSpendPercent}%`,
+                  transform: 'translateX(-50%)'
                 }}
               >
                 {avgSpendSliderValue} {currency}
@@ -443,68 +438,35 @@ export default function NoShowCalculator() {
         </>
       )}
 
-      {/* Ergebnisbereich */}
+      {/* Ergebnisbereich – nur Rate & Verlust + CTA */}
       {showResult && (
         <>
-          <h2 className="text-2xl font-bold text-center mb-4">Deine Auswertung</h2>
+          <h2 className="text-2xl font-bold text-center mb-6">Deine Auswertung</h2>
 
-          <div className="grid gap-4 sm:grid-cols-2 mb-6">
-            <div className="bg-pink-50 border border-pink-300 p-4 rounded-xl">
-              <h3 className="text-sm text-gray-500">
-                No-Show-Rate (Reservierungen, 30 Tage)
-              </h3>
-              <p className="text-xl font-semibold">{noShowRate.toFixed(1)}%</p>
+          <div className="grid gap-4 sm:grid-cols-2 mb-8">
+            {/* No-Show-Rate */}
+            <div className="bg-pink-50 border border-pink-300 p-6 rounded-xl text-center">
+              <h3 className="text-sm text-gray-500 mb-1">No-Show-Rate (30 Tage)</h3>
+              <p className="text-3xl font-semibold">{noShowRate.toFixed(1)}%</p>
             </div>
-            <div className="bg-pink-50 border border-pink-300 p-4 rounded-xl">
-              <h3 className="text-sm text-gray-500">No-Show-Umsatzverlust (30 Tage)</h3>
-              <p className="text-xl font-semibold">
+
+            {/* No-Show-Verlust */}
+            <div className="bg-pink-50 border border-pink-300 p-6 rounded-xl text-center">
+              <h3 className="text-sm text-gray-500 mb-1">No-Show-Verlust (30 Tage)</h3>
+              <p className="text-3xl font-semibold">
                 {format(loss30)} {currency}
-              </p>
-            </div>
-            <div className="bg-white border p-4 rounded-xl">
-              <h3 className="text-sm text-gray-500">Ø Auslastung (30 Tage)</h3>
-              <p className="text-xl font-semibold">
-                {occupancy !== null ? `${occupancy.toFixed(1)}%` : '–'}
-              </p>
-            </div>
-            <div className="bg-white border p-4 rounded-xl">
-              <h3 className="text-sm text-gray-500">Gesamtumsatz (30 Tage)</h3>
-              <p className="text-xl font-semibold">
-                {format(totalRevenue30)} {currency}
               </p>
             </div>
           </div>
 
-          <h3 className="text-lg font-semibold mt-6 mb-2">Dein Optimierungspotenzial</h3>
-          <ul className="space-y-2">
-            <li className="bg-green-50 border border-green-200 p-4 rounded-xl">
-              No-Show-Rate (letzte 30 Tage):{' '}
-              <strong>{noShowRate.toFixed(1)}%</strong>
-            </li>
-            <li className="bg-green-50 border border-green-200 p-4 rounded-xl">
-              Netto-Umsatzverlust durch No-Shows (30 Tage):{' '}
-              <strong>
-                {format(loss30)} {currency}
-              </strong>
-            </li>
-            <li className="bg-green-50 border border-green-200 p-4 rounded-xl">
-              Potenzielle Mehreinnahmen durch besseres Tisch- und Gästemanagement (Upselling):{' '}
-              <strong>
-                {format(upsell)} – {format(upsell * 3)} {currency} pro 30 Tage
-              </strong>
-            </li>
-            <li className="bg-green-50 border border-green-200 p-4 rounded-xl">
-              Geschätzter ROI beim Einsatz eines professionellen Reservierungssystems wie aleno:{' '}
-              <strong>{roi}-fach (mindestens)</strong>
-            </li>
-          </ul>
-
+          {/* Call to Action */}
           {showForm && (
-            <div className="text-center mt-8">
-              <p className="mb-2 font-semibold">
-                Möchtest du eine detaillierte Auswertung als PDF inkl. konkreter Handlungsempfehlungen für
-                dein Restaurant erhalten?
+            <div className="text-center mt-6">
+              <p className="mb-4 font-medium">
+                Möchtest du eine detaillierte Auswertung als PDF inkl. konkreter Handlungsempfehlungen
+                für dein Restaurant erhalten?
               </p>
+
               <button
                 type="button"
                 onClick={() => setShowContactForm(true)}
@@ -515,11 +477,12 @@ export default function NoShowCalculator() {
             </div>
           )}
 
+          {/* Kontaktformular */}
           {showContactForm && !submissionSuccess && (
             <form
               ref={contactFormRef}
               onSubmit={handleSubmit}
-              className="space-y-4 mt-6 border-t border-gray-200 pt-6"
+              className="space-y-4 mt-8 border-t border-gray-200 pt-6"
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <input
@@ -558,9 +521,7 @@ export default function NoShowCalculator() {
                   checked={acceptedPolicy}
                   onChange={(e) => {
                     setAcceptedPolicy(e.target.checked);
-                    if (e.target.checked) {
-                      setShowPolicyError(false);
-                    }
+                    if (e.target.checked) setShowPolicyError(false);
                   }}
                   className="mr-2 mt-1"
                 />
@@ -573,6 +534,7 @@ export default function NoShowCalculator() {
                   gelesen.
                 </label>
               </div>
+
               {showPolicyError && (
                 <p className="text-red-600 text-sm">Bitte bestätige die Datenschutzerklärung.</p>
               )}
@@ -593,6 +555,7 @@ export default function NoShowCalculator() {
             </form>
           )}
 
+          {/* Erfolgsmeldung */}
           {submissionSuccess && (
             <div className="text-center bg-green-100 border border-green-300 p-6 rounded-xl mt-6">
               <h2 className="text-xl font-semibold mb-2 text-green-800">Vielen Dank!</h2>
