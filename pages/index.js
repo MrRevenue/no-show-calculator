@@ -3,9 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 export default function NoShowCalculator() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    country: '',
     restaurantType: '',
-    seats: '',
     reservationsPerDay: '',
     avgGuestsPerReservation: '',
     openDays: '',
@@ -112,7 +110,7 @@ export default function NoShowCalculator() {
   ];
 
   const renderField = (field, label, type = 'text', options = null) => (
-    <div key={field} className="mb-4">
+    <div key={field} className="mb-8">
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       {options ? (
         <select
@@ -144,7 +142,7 @@ export default function NoShowCalculator() {
     </div>
   );
 
-  const currency = formData.country === 'Schweiz' ? 'CHF' : '€';
+  const currency = '€';
 
   // --- Rechenlogik (reservierungsbasiert, 30-Tage-Betrachtung) ---
 
@@ -153,7 +151,6 @@ export default function NoShowCalculator() {
   const openDaysPerWeek = +formData.openDays || 0; // Öffnungstage pro Woche
   const avgSpendPerGuest = +formData.averageSpend || 0; // Ø Umsatz pro Gast
   const noShowReservations30 = +formData.noShowReservationsLast30Days || 0; // No-Show-Reservierungen in 30 Tagen
-  const seats = +formData.seats || 0;
 
   // Slider-Defaults für Darstellung
   const avgGuestsSliderValue = avgGuestsPerReservation || 2.5;
@@ -189,13 +186,6 @@ export default function NoShowCalculator() {
   const recoveredByFees30 = noShowGuests30 * noShowFeePerGuest; // kompensiert durch Gebühren
   const loss30 = Math.max(grossLoss30 - recoveredByFees30, 0); // Nettoverlust
 
-  // Auslastung (optional, wenn Sitzplätze bekannt) – wird aktuell nicht angezeigt, aber berechnet
-  let occupancy = null;
-  if (seats > 0 && OPEN_DAYS_30 > 0) {
-    const capacityGuests30 = seats * OPEN_DAYS_30;
-    occupancy = capacityGuests30 > 0 ? (totalGuests30 / capacityGuests30) * 100 : null;
-  }
-
   // Upsell-Potenzial & grober ROI – nur für den PDF-Report relevant
   const upsell = totalRevenue30 * 0.05; // 5% zusätzlicher Umsatz
   const roi = Math.floor((loss30 + upsell) / 350); // grob bei 350 €/Monat Systemkosten
@@ -221,7 +211,6 @@ export default function NoShowCalculator() {
         totalRevenue30,
         upsell,
         roi,
-        occupancy,
         totalReservations30,
         totalGuests30,
         noShowGuests30
@@ -279,7 +268,7 @@ export default function NoShowCalculator() {
           )}
 
           {/* 2. Ø Gäste pro Reservierung – Slider direkt danach */}
-          <div className="mb-8">
+          <div className="mb-10">
             <label className="block text-sm font-medium text-gray-700 mb-4">
               Ø Gäste pro Reservierung (z. B. 2,5)
             </label>
@@ -322,7 +311,7 @@ export default function NoShowCalculator() {
           )}
 
           {/* 4. Ø Umsatz pro Gast – Slider */}
-          <div className="mb-8">
+          <div className="mb-10">
             <label className="block text-sm font-medium text-gray-700 mb-4">
               Ø Umsatz pro Gast ({currency})
             </label>
@@ -357,16 +346,10 @@ export default function NoShowCalculator() {
             </p>
           </div>
 
-          {/* 5. No-Shows & Kapazität */}
+          {/* 5. No-Shows */}
           {renderField(
             'noShowReservationsLast30Days',
             'Wie viele Reservierungen sind in den letzten 30 Tagen nicht erschienen (No-Shows)?',
-            'number'
-          )}
-
-          {renderField(
-            'seats',
-            'Anzahl Sitzplätze (optional – für Auslastung)',
             'number'
           )}
 
