@@ -155,6 +155,14 @@ export default function NoShowCalculator() {
   const noShowReservations30 = +formData.noShowReservationsLast30Days || 0; // No-Show-Reservierungen in 30 Tagen
   const seats = +formData.seats || 0;
 
+  // Slider-Defaults für Darstellung
+  const avgGuestsSliderValue = formData.avgGuestsPerReservation
+    ? +formData.avgGuestsPerReservation
+    : 2.5;
+  const avgSpendSliderValue = formData.averageSpend
+    ? +formData.averageSpend
+    : 50;
+
   // No-Show-Gebühr nur, wenn wirklich erhoben
   const noShowFeePerGuest =
     formData.feeForNoShow === 'Ja' ? (+formData.noShowFee || 0) : 0;
@@ -271,63 +279,84 @@ export default function NoShowCalculator() {
             'number'
           )}
 
+          {/* 2. Ø Gäste pro Reservierung – Slider direkt danach */}
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Ø Gäste pro Reservierung (z. B. 2,5)
+            </label>
+
+            <div className="relative w-full">
+              {/* Value Bubble */}
+              <div
+                className="absolute -top-6 text-xs font-semibold text-pink-600"
+                style={{
+                  left: `calc(${((avgGuestsSliderValue - 1) / (8 - 1)) * 100}% - 12px)`
+                }}
+              >
+                {avgGuestsSliderValue}
+              </div>
+
+              {/* Pink Slider */}
+              <input
+                type="range"
+                name="avgGuestsPerReservation"
+                min="1"
+                max="8"
+                step="0.5"
+                value={avgGuestsSliderValue}
+                onChange={handleChange}
+                className="pink-slider"
+              />
+            </div>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Die meisten Restaurants liegen zwischen 2,0 und 3,0 Gästen pro Reservierung.
+            </p>
+          </div>
+
+          {/* 3. Öffnungstage */}
           {renderField(
             'openDays',
             'Anzahl Tage pro Woche geöffnet (z. B. 5)',
             'number'
           )}
 
-          {/* 2. Ø Gäste pro Reservierung – als Slider */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ø Gäste pro Reservierung (z. B. 2,5)
-            </label>
-
-            <input
-              type="range"
-              name="avgGuestsPerReservation"
-              min="1"
-              max="8"
-              step="0.5"
-              value={formData.avgGuestsPerReservation || 2.5}
-              onChange={handleChange}
-              className="w-full"
-            />
-
-            <div className="text-center font-semibold mt-1">
-              {formData.avgGuestsPerReservation || 2.5}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Die meisten Restaurants liegen zwischen 2,0 und 3,0 Gästen pro Reservierung.
-            </p>
-          </div>
-
-          {/* 3. Ø Umsatz pro Gast – als Slider */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          {/* 4. Ø Umsatz pro Gast – Slider */}
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Ø Umsatz pro Gast ({currency})
             </label>
 
-            <input
-              type="range"
-              name="averageSpend"
-              min="10"
-              max="200"
-              step="5"
-              value={formData.averageSpend || 50}
-              onChange={handleChange}
-              className="w-full"
-            />
+            <div className="relative w-full">
+              {/* Value Bubble */}
+              <div
+                className="absolute -top-6 text-xs font-semibold text-pink-600"
+                style={{
+                  left: `calc(${((avgSpendSliderValue - 10) / (200 - 10)) * 100}% - 12px)`
+                }}
+              >
+                {avgSpendSliderValue} {currency}
+              </div>
 
-            <div className="text-center font-semibold mt-1">
-              {formData.averageSpend || 50} {currency}
+              {/* Pink Slider */}
+              <input
+                type="range"
+                name="averageSpend"
+                min="10"
+                max="200"
+                step="5"
+                value={avgSpendSliderValue}
+                onChange={handleChange}
+                className="pink-slider"
+              />
             </div>
+
             <p className="text-xs text-gray-500 mt-1">
               Schätzung reicht aus – nimm den durchschnittlichen Bon inklusive Getränke.
             </p>
           </div>
 
-          {/* 4. No-Shows & Kapazität */}
+          {/* 5. No-Shows & Kapazität */}
           {renderField(
             'noShowReservationsLast30Days',
             'Wie viele Reservierungen sind in den letzten 30 Tagen nicht erschienen (No-Shows)?',
