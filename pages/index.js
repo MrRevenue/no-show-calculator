@@ -12,15 +12,12 @@ export default function NoShowCalculator() {
     averageSpend: '',
     noShowGuestsLast30Days: '',
     hasOnlineReservation: '',
-    reservationRate: '',
     reservationTool: '',
     feeForNoShow: '',
     noShowFee: '',
-    waitlist: '',
     firstName: '',
     lastName: '',
-    email: '',
-    mobile: ''
+    email: ''
   });
   const [formErrors, setFormErrors] = useState({});
   const [showResult, setShowResult] = useState(false);
@@ -47,21 +44,19 @@ export default function NoShowCalculator() {
 
   const validateStep = () => {
     const requiredByStep = {
-      // bewusst schlanke Pflichtfelder in Schritt 1
-      1: ['guestsPerDay', 'openDays', 'guestReservationRate', 'averageSpend', 'noShowGuestsLast30Days'],
-      2: [
+     // Step 1 bleibt wie gehabt
+        1: ['guestsPerDay', 'openDays', 'guestReservationRate', 'averageSpend', 'noShowGuestsLast30Days'],
+      // Step 2: nur diese Felder sind Pflicht
+        2: [
         'hasOnlineReservation',
-        ...(formData.hasOnlineReservation === 'Ja'
-          ? [
-              'reservationTool',
-              'reservationRate',
-              'feeForNoShow',
-              ...(formData.feeForNoShow === 'Ja' ? ['noShowFee'] : []),
-              'waitlist'
-            ]
-          : [])
-      ]
-    };
+      ...(formData.hasOnlineReservation === 'Ja'
+        ? [
+            'feeForNoShow',
+            ...(formData.feeForNoShow === 'Ja' ? ['noShowFee'] : [])
+          ]
+        : [])
+    ]
+  };
 
     const errors = {};
     for (const field of requiredByStep[step] || []) {
@@ -239,29 +234,20 @@ export default function NoShowCalculator() {
             <>
               {renderField(
                 'reservationTool',
-                'Welches Reservierungssystem?',
+                'Welches Reservierungssystem nutzt du aktuell? (optional)',
                 'text',
                 reservationToolOptions
               )}
-              {renderField(
-                'reservationRate',
-                'Wie viel % der Reservierungen erfolgen online?',
-                'number'
-              )}
+
               {renderField(
                 'feeForNoShow',
-                'Werden No-Show-Gebühren erhoben?',
+                'Erhebst du No-Show-Gebühren?',
                 'text',
                 ['', 'Ja', 'Nein']
               )}
+
               {formData.feeForNoShow === 'Ja' &&
                 renderField('noShowFee', 'Wie hoch ist die No-Show-Gebühr pro Gast?', 'number')}
-              {renderField(
-                'waitlist',
-                'Ist eine Warteliste vorhanden?',
-                'text',
-                ['', 'Ja', 'Nein']
-              )}
             </>
           )}
 
@@ -383,16 +369,6 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 type="email"
                 placeholder="E-Mail"
-                className="border border-gray-300 p-2 rounded w-full"
-                required
-              />
-
-              <input
-                name="mobile"
-                value={formData.mobile}
-                onChange={handleChange}
-                type="tel"
-                placeholder="Mobile-Nummer"
                 className="border border-gray-300 p-2 rounded w-full"
                 required
               />
