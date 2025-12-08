@@ -281,14 +281,14 @@ export default function NoShowCalculator() {
 
           {/* 2. Ø Gäste pro Reservierung – Slider direkt danach */}
           <div className="mb-8">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-4">
               Ø Gäste pro Reservierung (z. B. 2,5)
             </label>
 
             <div className="relative w-full">
               {/* Value Bubble */}
               <div
-                className="absolute -top-6 text-xs font-semibold text-pink-600"
+                className="absolute -top-4 text-xs font-semibold text-pink-600"
                 style={{
                   left: `calc(${((avgGuestsSliderValue - 1) / (8 - 1)) * 100}% - 12px)`
                 }}
@@ -323,14 +323,14 @@ export default function NoShowCalculator() {
 
           {/* 4. Ø Umsatz pro Gast – Slider */}
           <div className="mb-8">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-4">
               Ø Umsatz pro Gast ({currency})
             </label>
 
             <div className="relative w-full">
               {/* Value Bubble */}
               <div
-                className="absolute -top-6 text-xs font-semibold text-pink-600"
+                className="absolute -top-4 text-xs font-semibold text-pink-600"
                 style={{
                   left: `calc(${((avgSpendSliderValue - 10) / (200 - 10)) * 100}% - 12px)`
                 }}
