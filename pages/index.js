@@ -44,8 +44,9 @@ export default function NoShowCalculator() {
 
   const validateStep = () => {
     const requiredByStep = {
-      // Schritt 1 – Reservierungsbasierte Grunddaten
+      // Schritt 1 – Basis: Reservierungen
       1: [
+        'restaurantType',
         'reservationsPerDay',
         'avgGuestsPerReservation',
         'openDays',
@@ -96,6 +97,18 @@ export default function NoShowCalculator() {
     'Zenchef',
     'ein anderes',
     'Das weiß ich gerade nicht'
+  ];
+
+  const restaurantTypeOptions = [
+    '',
+    'Fine Dining',
+    'Casual Dining / Bistro',
+    'Café / Konditorei',
+    'Bar / Pub / Weinbar',
+    'Hotelrestaurant',
+    'Popup-Restaurant',
+    'Systemgastronomie',
+    'Sonstiges'
   ];
 
   const renderField = (field, label, type = 'text', options = null) => (
@@ -243,31 +256,84 @@ export default function NoShowCalculator() {
             Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.
           </p>
 
+          {/* Restaurant-Typ */}
+          {renderField(
+            'restaurantType',
+            'Welcher Restaurant-Typ trifft am besten auf dich zu?',
+            'text',
+            restaurantTypeOptions
+          )}
+
+          {/* 1. Struktur deines Betriebs */}
           {renderField(
             'reservationsPerDay',
             'Ø Reservierungen pro Öffnungstag (z. B. 40)',
             'number'
           )}
-          {renderField(
-            'avgGuestsPerReservation',
-            'Ø Gäste pro Reservierung (z. B. 2,5)',
-            'number'
-          )}
+
           {renderField(
             'openDays',
             'Anzahl Tage pro Woche geöffnet (z. B. 5)',
             'number'
           )}
-          {renderField(
-            'averageSpend',
-            `Ø Umsatz pro Gast (${currency})`,
-            'number'
-          )}
+
+          {/* 2. Ø Gäste pro Reservierung – als Slider */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ø Gäste pro Reservierung (z. B. 2,5)
+            </label>
+
+            <input
+              type="range"
+              name="avgGuestsPerReservation"
+              min="1"
+              max="8"
+              step="0.5"
+              value={formData.avgGuestsPerReservation || 2.5}
+              onChange={handleChange}
+              className="w-full"
+            />
+
+            <div className="text-center font-semibold mt-1">
+              {formData.avgGuestsPerReservation || 2.5}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Die meisten Restaurants liegen zwischen 2,0 und 3,0 Gästen pro Reservierung.
+            </p>
+          </div>
+
+          {/* 3. Ø Umsatz pro Gast – als Slider */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ø Umsatz pro Gast ({currency})
+            </label>
+
+            <input
+              type="range"
+              name="averageSpend"
+              min="10"
+              max="200"
+              step="5"
+              value={formData.averageSpend || 50}
+              onChange={handleChange}
+              className="w-full"
+            />
+
+            <div className="text-center font-semibold mt-1">
+              {formData.averageSpend || 50} {currency}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Schätzung reicht aus – nimm den durchschnittlichen Bon inklusive Getränke.
+            </p>
+          </div>
+
+          {/* 4. No-Shows & Kapazität */}
           {renderField(
             'noShowReservationsLast30Days',
             'Wie viele Reservierungen sind in den letzten 30 Tagen nicht erschienen (No-Shows)?',
             'number'
           )}
+
           {renderField(
             'seats',
             'Anzahl Sitzplätze (optional – für Auslastung)',
@@ -349,7 +415,9 @@ export default function NoShowCalculator() {
 
           <div className="grid gap-4 sm:grid-cols-2 mb-6">
             <div className="bg-pink-50 border border-pink-300 p-4 rounded-xl">
-              <h3 className="text-sm text-gray-500">No-Show-Rate (Reservierungen, 30 Tage)</h3>
+              <h3 className="text-sm text-gray-500">
+                No-Show-Rate (Reservierungen, 30 Tage)
+              </h3>
               <p className="text-xl font-semibold">{noShowRate.toFixed(1)}%</p>
             </div>
             <div className="bg-pink-50 border border-pink-300 p-4 rounded-xl">
