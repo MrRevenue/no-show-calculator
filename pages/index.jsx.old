@@ -1,0 +1,293 @@
+
+import { useState } from 'react';
+
+export default function Home() {
+  const [step, setStep] = useState(1);
+  const [showResult, setShowResult] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
+
+  const [formData, setFormData] = useState({
+    country: '',
+    restaurantType: '',
+    locationCount: '',
+    seats: '',
+    guestsPerDay: '',
+    guestReservationRate: '',
+    openDays: '',
+    averageSpend: '',
+    noShowGuestsLast30Days: '',
+    hasOnlineReservation: '',
+    reservationTool: '',
+    customReservationTool: '',
+    reservationRate: '',
+    waitlist: '',
+    feeForNoShow: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    mobile: ''
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const currency = formData.country === 'Schweiz' ? 'CHF' : 'EUR';
+  const calculateLoss = () => formData.noShowGuestsLast30Days * formData.averageSpend;
+
+  const totalGuestsPerMonth = formData.guestsPerDay * (formData.openDays * 4.35);
+  const totalRevenue = totalGuestsPerMonth * formData.averageSpend;
+  const totalReservations = totalGuestsPerMonth * (formData.guestReservationRate / 100);
+  const rawNoShowRate = totalReservations > 0 ? (formData.noShowGuestsLast30Days / totalReservations * 100) : 0;
+  const adjustedNoShowRate = Math.max(0, (rawNoShowRate - 0.3).toFixed(1));
+  const monthlyUpsellPotential = (calculateLoss() + 0.15 * (totalRevenue + calculateLoss()));
+  const multiLocationLoss = formData.locationCount > 1 ? formData.locationCount * calculateLoss() : null;
+
+  const nextStep = () => setStep(s => s + 1);
+  const prevStep = () => setStep(s => s - 1);
+
+  const isValidStep1 = () => {
+    const requiredFields = ['country', 'restaurantType', 'locationCount', 'seats', 'guestsPerDay', 'guestReservationRate', 'openDays', 'averageSpend', 'noShowGuestsLast30Days'];
+    return requiredFields.every(field => formData[field] !== '' && formData[field] !== null);
+  };
+
+  const isValidStep2 = () => {
+    if (formData.hasOnlineReservation === '') return false;
+    if (formData.hasOnlineReservation === 'Ja' && formData.reservationTool === '') return false;
+    return true;
+  };
+
+  const isValidEmail = email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const isValidPhone = phone => /^[0-9\-\+]{9,15}$/.test(phone);
+
+  const isStepDisabled = step === 1 ? !isValidStep1() : step === 2 ? !isValidStep2() : false;
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
+      <div className="max-w-xl w-full">
+        {/* Der gesamte überarbeitete Code wird in einem weiteren Schritt ergänzt */}
+      </div>
+    </div>
+  );
+}
+
+        {!showResult && step === 1 && (
+          <form className="space-y-6">
+            <h1 className="text-2xl font-bold mb-4">No-Show Rechner</h1>
+            <h2 className="text-xl font-bold mb-4">Allgemeine Angaben</h2>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Land</label>
+              <select name="country" value={formData.country} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full" required>
+                <option value="">Bitte wählen</option>
+                <option value="Deutschland">Deutschland</option>
+                <option value="Schweiz">Schweiz</option>
+                <option value="Österreich">Österreich</option>
+                <option value="Italien">Italien</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Restaurant-Typ</label>
+              <select name="restaurantType" value={formData.restaurantType} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full" required>
+                <option value="">Bitte wählen</option>
+                <option value="Casual">Casual</option>
+                <option value="Fine Dining">Fine Dining</option>
+                <option value="Pop-up">Pop-up</option>
+                <option value="Hotelrestaurant">Hotelrestaurant</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Wie viele Standorte hat das Restaurant?</label>
+              <input name="locationCount" value={formData.locationCount} onChange={handleChange} type="number" min="1" max="999" required className="border border-gray-300 rounded p-2 w-full" />
+            </div>
+
+            {formData.locationCount > 1 && (
+              <p className="text-sm text-gray-600">Die folgenden Angaben beziehen sich bitte auf eines deiner Restaurants – du kannst selbst wählen welches.</p>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Anzahl Sitzplätze</label>
+              <input name="seats" value={formData.seats} onChange={handleChange} type="number" min="1" className="border border-gray-300 rounded p-2 w-full" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Ø Gäste pro Öffnungstag</label>
+              <input name="guestsPerDay" value={formData.guestsPerDay} onChange={handleChange} type="number" min="0" className="border border-gray-300 rounded p-2 w-full" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Anzahl Tage pro Woche geöffnet</label>
+              <input name="openDays" value={formData.openDays} onChange={handleChange} type="number" min="1" max="7" className="border border-gray-300 rounded p-2 w-full" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Wie viel % deiner Gäste reservieren vorab?</label>
+              <input name="guestReservationRate" value={formData.guestReservationRate} onChange={handleChange} type="number" min="0" max="100" className="border border-gray-300 rounded p-2 w-full" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Ø Umsatz pro Gast (Ø Bon) in {currency}</label>
+              <input name="averageSpend" value={formData.averageSpend} onChange={handleChange} type="number" min="0" className="border border-gray-300 rounded p-2 w-full" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Wie viele No-Shows gab es im Restaurant in den letzten 30 Tagen circa?</label>
+              <input name="noShowGuestsLast30Days" value={formData.noShowGuestsLast30Days} onChange={handleChange} type="number" min="0" className="border border-gray-300 rounded p-2 w-full" required />
+            </div>
+
+            <div className="flex justify-between">
+              <button type="button" onClick={nextStep} disabled={isStepDisabled} className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50">Weiter</button>
+            </div>
+          </form>
+        )}
+
+        {!showResult && step === 2 && (
+          <form className="space-y-6">
+            <h2 className="text-xl font-bold mb-4">Reservierungen & Systeme</h2>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Ist für das Restaurant ein Online-Reservierungssystem im Einsatz?</label>
+              <select name="hasOnlineReservation" value={formData.hasOnlineReservation} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full">
+                <option value="">Bitte wählen</option>
+                <option value="Ja">Ja</option>
+                <option value="Nein">Nein</option>
+              </select>
+            </div>
+
+            {formData.hasOnlineReservation === 'Ja' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Welches Reservierungssystem?</label>
+                  <select name="reservationTool" value={formData.reservationTool} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full">
+                    <option value="">Bitte wählen</option>
+                    <option value="aleno">aleno</option>
+                    <option value="CentralPlanner">CentralPlanner</option>
+                    <option value="Formitable">Formitable</option>
+                    <option value="Foratable">Foratable</option>
+                    <option value="Gastronovi">Gastronovi</option>
+                    <option value="OpenTable">OpenTable</option>
+                    <option value="Quandoo">Quandoo</option>
+                    <option value="Resmio">Resmio</option>
+                    <option value="Seatris">Seatris</option>
+                    <option value="Tablein">Tablein</option>
+                    <option value="The Fork">The Fork</option>
+                    <option value="Zenchef">Zenchef</option>
+                    <option value="ein anderes">ein anderes</option>
+                  </select>
+                </div>
+
+                {formData.reservationTool === 'ein anderes' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Anderes System (bitte angeben)</label>
+                    <input name="customReservationTool" value={formData.customReservationTool} onChange={handleChange} type="text" className="border border-gray-300 rounded p-2 w-full" />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Wie viel % der Reservierungen erfolgen online?</label>
+                  <input name="reservationRate" value={formData.reservationRate} onChange={handleChange} type="number" min="0" max="100" className="border border-gray-300 rounded p-2 w-full" />
+                </div>
+              </>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Ist eine Warteliste vorhanden?</label>
+              <select name="waitlist" value={formData.waitlist} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full">
+                <option value="">Bitte wählen</option>
+                <option value="Ja">Ja</option>
+                <option value="Nein">Nein</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Werden No-Show-Gebühren erhoben?</label>
+              <select name="feeForNoShow" value={formData.feeForNoShow} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full">
+                <option value="">Bitte wählen</option>
+                <option value="Ja">Ja</option>
+                <option value="Nein">Nein</option>
+              </select>
+            </div>
+
+            <div className="flex justify-between">
+              <button type="button" onClick={prevStep} className="bg-gray-300 text-black px-4 py-2 rounded">Zurück</button>
+              <button type="button" onClick={() => setShowResult(true)} className="bg-green-600 text-white px-4 py-2 rounded">Auswertung anzeigen</button>
+            </div>
+          </form>
+        )}
+
+        {showResult && (
+          <div className="mt-10 space-y-8">
+            <h2 className="text-2xl font-bold text-center mb-6">Dein Ergebnis</h2>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="bg-pink-50 border border-pink-300 shadow rounded-xl p-4">
+                <h3 className="text-sm text-gray-500">Deine No-Show-Rate</h3>
+                <p className="text-xl font-semibold">-{adjustedNoShowRate}%</p>
+              </div>  
+              <div className="bg-pink-50 border border-pink-300 shadow rounded-xl p-4">
+                <h3 className="text-sm text-gray-500">Monatlich zusätzliches Umsatzpotenzial</h3>
+                <p className="text-xl font-semibold">{monthlyUpsellPotential.toFixed(2)} {currency}</p>
+              </div>            
+              <div className="bg-white shadow rounded-xl p-4">
+                <h3 className="text-sm text-gray-500">Ø Auslastung (30 Tage)</h3>
+                <p className="text-xl font-semibold">
+                  {(((+formData.guestsPerDay * formData.openDays * 4.35) / (+formData.seats * formData.openDays * 4.35)) * 100).toFixed(1)}%
+                </p>
+              </div>
+              <div className="bg-white shadow rounded-xl p-4">
+                <h3 className="text-sm text-gray-500">Gesamtumsatz (30 Tage)</h3>
+                <p className="text-xl font-semibold">{totalRevenue.toFixed(2)} {currency}</p>
+              </div>
+
+              {multiLocationLoss && (
+                <div className="bg-white shadow rounded-xl p-4 col-span-2">
+                  <h3 className="text-sm text-gray-500">Geschätzter Umsatzverlust über alle Standorte</h3>
+                  <p className="text-xl font-semibold">{multiLocationLoss.toFixed(2)} {currency}</p>
+                </div>
+              )}
+            </div>
+
+            <h3 className="text-lg font-semibold mt-6">Dein Optimierungspotenzial</h3>
+            <ul className="space-y-2">
+              <li className="bg-green-50 border border-green-200 p-4 rounded-xl">Umsatzsteigerung durch personalisiertes Upselling: <strong>{(formData.guestsPerDay * 30 * formData.averageSpend * 0.05).toFixed(0)} – {(formData.guestsPerDay * 30 * formData.averageSpend * 0.15).toFixed(0)} {currency}</strong></li>
+              {formData.hasOnlineReservation !== 'Ja' && (
+                <li className="bg-green-50 border border-green-200 p-4 rounded-xl">Auslastungssteigerung durch Digitalisierung: <strong>+15%</strong></li>
+              )}
+            </ul>
+
+            <div className="mt-6 text-center">
+              <p className="mb-2 font-semibold">Möchtest du einen PDF-Report mit individuell auf deinen Betrieb zugeschnittenen Handlungsempfehlungen?</p>
+              <button onClick={() => setShowContactForm(true)} className="bg-blue-500 text-white px-4 py-2 rounded">Ja, Report erhalten</button>
+            </div>
+
+            {showContactForm && (
+              <form className="space-y-4 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Vorname</label>
+                  <input name="firstName" value={formData.firstName} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Nachname</label>
+                  <input name="lastName" value={formData.lastName} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">E-Mail</label>
+                  <input name="email" type="email" value={formData.email} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Mobile-Nummer</label>
+                  <input name="mobile" type="tel" value={formData.mobile} onChange={handleChange} className="border border-gray-300 rounded p-2 w-full" required />
+                </div>
+                <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded w-full">PDF-Report anfordern</button>
+              </form>
+            )}
+          </div>
+        )}
+          </div>
+          ───
+      </div>
+    </div>
