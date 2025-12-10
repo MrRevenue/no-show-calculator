@@ -1,172 +1,678 @@
 import { useEffect, useRef, useState } from 'react';
 
-// pages/index.js
-import { useState } from 'react';
-
-export default function Home() {
+export default function NoShowCalculator() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    avgReservationsPerDay: '',
-    avgGuestsPerReservation: '2',
-    noShowsLast30Days: '',
     restaurantType: '',
-    openDaysPerWeek: '',
-    revenuePerGuest: '',
+    reservationsPerDay: '',
+    avgGuestsPerReservation: '2', // Default: 2 Gäste
+    openDays: '',
+    averageSpend: '',
+    noShowGuestsLast30Days: '',
     hasOnlineReservation: '',
     reservationTool: '',
-    customReservationTool: '',
-    chargesNoShowFee: '',
+    feeForNoShow: '',
     noShowFee: '',
     firstName: '',
     lastName: '',
     email: '',
-    restaurantName: '',
+    restaurantName: ''
   });
+  const [formErrors, setFormErrors] = useState({});
   const [showResult, setShowResult] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
+  const [showPolicyError, setShowPolicyError] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState(null); // 'submitting' | 'success' | 'error' | null
+  const [showForm, setShowForm] = useState(true);
+  const [emailError, setEmailError] = useState('');
+  const contactFormRef = useRef(null);
+
+  useEffect(() => {
+    if (showContactForm && contactFormRef.current) {
+      contactFormRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [showContactForm]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const newValue = type === 'checkbox' ? checked : value;
+
+    setFormData((prev) => ({ ...prev, [name]: newValue }));
+    setFormErrors((prev) => ({ ...prev, [name]: false }));
+
+    if (name === 'email') {
+      setEmailError('');
+    }
+
+    if (name === 'hasOnlineReservation' && value !== 'Ja') {
+      // Relevante Fehler zurücksetzen, wenn kein System eingesetzt wird
+      setFormErrors((prev) => ({
+        ...prev,
+        reservationTool: false,
+        feeForNoShow: false,
+        noShowFee: false
+      }));
+    }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (step < 3 || (step === 3 && formData.hasOnlineReservation === 'Ja')) {
-      setStep(step + 1);
-    } else {
+  const validateStep = (currentStep = step) => {
+    const requiredByStep = {
+      // Schritt 1
+      1: ['reservationsPerDay', 'avgGuestsPerReservation', 'noShowGuestsLast30Days'],
+
+      // Schritt 2
+      2: ['restaurantType', 'openDays', 'averageSpend', 'hasOnlineReservation'],
+
+      // Schritt 3 – nur wenn Online-Reservierung
+      3:
+        formData.hasOnlineReservation === 'Ja'
+          ? [
+              'reservationTool',
+              'feeForNoShow',
+              ...(formData.feeForNoShow === 'Ja' ? ['noShowFee'] : [])
+            ]
+          : []
+    };
+
+    const errors = {};
+    for (const field of requiredByStep[currentStep] || []) {
+      if (!formData[field]) {
+        errors[field] = true;
+      }
+    }
+    setFormErrors((prev) => ({ ...prev, ...errors }));
+    return Object.keys(errors).length === 0;
+  };
+
+  const goFromStep1 = () => {
+    if (validateStep(1)) {
+      setStep(2);
+    }
+  };
+
+  const goFromStep2 = () => {
+    if (validateStep(2)) {
+      if (formData.hasOnlineReservation === 'Ja') {
+        setStep(3);
+      } else {
+        setShowResult(true);
+      }
+    }
+  };
+
+  const goFromStep3 = () => {
+    if (validateStep(3)) {
       setShowResult(true);
     }
   };
 
-  const calculateLoss = () => {
-    const revenuePerGuest = parseFloat(formData.revenuePerGuest) || 0;
-    const noShows = parseFloat(formData.noShowsLast30Days) || 0;
-    return (noShows * revenuePerGuest).toFixed(2);
+  const reservationToolOptions = [
+    '',
+    'aleno',
+    'CentralPlanner',
+    'Formitable',
+    'Foratable',
+    'Gastronovi',
+    'OpenTable',
+    'Quandoo',
+    'Resmio',
+    'Seatris',
+    'Tablein',
+    'The Fork',
+    'Zenchef',
+    'ein anderes',
+    'Das weiß ich gerade nicht'
+  ];
+
+  const restaurantTypeOptions = [
+    '',
+    'Fine Dining',
+    'Casual Dining / Bistro',
+    'Café / Konditorei',
+    'Bar / Pub / Weinbar',
+    'Hotelrestaurant',
+    'Popup-Restaurant',
+    'Systemgastronomie',
+    'Sonstiges'
+  ];
+
+  const renderField = (field, label, type = 'text', options = null) => (
+    <div key={field} className="mb-8">
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {options ? (
+        <select
+          name={field}
+          value={formData[field]}
+          onChange={handleChange}
+          className={`border p-2 w-full rounded ${
+            formErrors[field] ? 'border-pink-500' : 'border-gray-300'
+          }`}
+        >
+          {options.map((opt, i) => (
+            <option key={i} value={opt}>
+              {opt || 'Bitte wählen'}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          name={field}
+          type={type}
+          value={formData[field]}
+          onChange={handleChange}
+          className={`border p-2 w-full rounded ${
+            formErrors[field] ? 'border-pink-500' : 'border-gray-300'
+          }`}
+        />
+      )}
+      {formErrors[field] && (
+        <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
+      )}
+    </div>
+  );
+
+  const currency = '€';
+
+  // --- Rechenlogik (personenbasiert, 30-Tage-Betrachtung) ---
+
+  const reservationsPerDay = +formData.reservationsPerDay || 0; // Ø Reservierungen pro Öffnungstag
+  const avgGuestsPerReservation = +formData.avgGuestsPerReservation || 0; // Ø Gäste pro Reservierung
+  const openDaysPerWeek = +formData.openDays || 0; // Öffnungstage pro Woche
+  const avgSpendPerGuest = +formData.averageSpend || 0; // Ø Umsatz pro Gast
+  const noShowGuestsInput30 = +formData.noShowGuestsLast30Days || 0; // Gäste, die trotz Reservierung nicht erschienen sind (30 Tage)
+
+  // Slider-Defaults für Darstellung
+  const avgGuestsSliderValue = avgGuestsPerReservation || 2;
+  const avgSpendSliderValue = avgSpendPerGuest || 50;
+
+  // Prozentwerte für Bubble
+  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (8 - 1)) * 100; // Range 1–8
+  const avgSpendPercent = ((avgSpendSliderValue - 10) / (500 - 10)) * 100; // Range 10–500
+
+  // No-Show-Gebühr nur, wenn wirklich erhoben
+  const noShowFeePerGuest =
+    formData.feeForNoShow === 'Ja' ? +formData.noShowFee || 0 : 0;
+
+  // Anzahl Öffnungstage in 30 Tagen (ausgehend von openDaysPerWeek)
+  const OPEN_DAYS_30 = openDaysPerWeek > 0 ? (openDaysPerWeek / 7) * 30 : 0;
+
+  // Gesamtreservierungen & Gäste in 30 Tagen
+  const totalReservations30 = reservationsPerDay * OPEN_DAYS_30;
+  const totalGuests30 = totalReservations30 * avgGuestsPerReservation;
+
+  // No-Show-Gäste in 30 Tagen
+  const noShowGuests30 = noShowGuestsInput30;
+
+  // No-Show-Rate bezogen auf Gäste
+  const noShowRate =
+    totalGuests30 > 0 ? (noShowGuests30 / totalGuests30) * 100 : 0;
+
+  // Umsatz in 30 Tagen
+  const totalRevenue30 = totalGuests30 * avgSpendPerGuest;
+
+  // No-Show-Verlust in 30 Tagen
+  const grossLoss30 = noShowGuests30 * avgSpendPerGuest; // entgangener Umsatz
+  const recoveredByFees30 = noShowGuests30 * noShowFeePerGuest; // kompensiert durch Gebühren
+  const loss30 = Math.max(grossLoss30 - recoveredByFees30, 0); // Nettoverlust
+
+  // Upsell-Potenzial & grober ROI – nur für den PDF-Report relevant
+  const upsell = totalRevenue30 * 0.05; // 5% zusätzlicher Umsatz
+  const roi = Math.floor((loss30 + upsell) / 350); // grob bei 350 €/Monat Systemkosten
+
+  const format = (val) => Math.round(val).toLocaleString('de-DE');
+
+  const isBusinessEmail = (email) => {
+    const freeDomains = [
+      'gmail.com',
+      'googlemail.com',
+      'outlook.com',
+      'hotmail.com',
+      'live.com',
+      'yahoo.com',
+      'yahoo.de',
+      'gmx.de',
+      'gmx.net',
+      'web.de',
+      'icloud.com',
+      'me.com',
+      't-online.de',
+      'protonmail.com',
+      'aol.com'
+    ];
+
+    const match = email.trim().toLowerCase().match(/@([^@]+)$/);
+    if (!match) return false;
+    const domain = match[1];
+    return !freeDomains.includes(domain);
   };
 
-  const calculateNoShowRate = () => {
-    const resPerDay = parseFloat(formData.avgReservationsPerDay) || 0;
-    const guestsPerRes = parseFloat(formData.avgGuestsPerReservation) || 0;
-    const openDays = parseFloat(formData.openDaysPerWeek) || 0;
-    const totalGuests = resPerDay * guestsPerRes * openDays * 4.3;
-    const noShows = parseFloat(formData.noShowsLast30Days) || 0;
-    return totalGuests ? ((noShows / totalGuests) * 100).toFixed(1) + '%' : '0%';
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!acceptedPolicy) {
+      setShowPolicyError(true);
+      return;
+    }
+
+    if (!isBusinessEmail(formData.email)) {
+      setEmailError(
+        'Bitte gib eine geschäftliche E-Mail-Adresse an (keine Freemailer wie gmail.com, gmx.de etc.).'
+      );
+      return;
+    }
+
+    setSubmissionStatus('submitting');
+    setShowPolicyError(false);
+
+    const fullFormData = {
+      ...formData,
+      calculated: {
+        noShowRate,
+        loss30,
+        totalRevenue30,
+        upsell,
+        roi,
+        totalReservations30,
+        totalGuests30,
+        noShowGuests30
+      }
+    };
+
+    try {
+      const res = await fetch('/api/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullFormData)
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        setSubmissionSuccess(true);
+        setShowForm(false);
+        setSubmissionStatus('success');
+      } else {
+        console.error('❌ Fehler beim Versand:', result.error || 'Unbekannter Fehler');
+        setSubmissionStatus('error');
+      }
+    } catch (error) {
+      console.error('❌ Netzwerkfehler:', error);
+      setSubmissionStatus('error');
+    }
   };
+
+  // Fortschrittsbalken (4 Schritte: 3 Fragen-Schritte + Auswertung)
+  const totalSteps = 4;
+  const currentStepForProgress = showResult ? 4 : step;
+  const progressPercent = (currentStepForProgress / totalSteps) * 100;
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">No-Show Rechner</h1>
-      {!showResult && (
-        <form onSubmit={handleSubmit}>
-          {step === 1 && (
-            <div>
-              <label>Ø Reservierungen pro Öffnungstag</label>
-              <input type="number" name="avgReservationsPerDay" value={formData.avgReservationsPerDay} onChange={handleChange} required className="w-full border p-2 mb-4" />
+    <div className="max-w-xl mx-auto p-6">
+      {/* Fortschrittsbalken */}
+      <div className="mb-6">
+        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-pink-500 transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <p className="mt-1 text-xs text-gray-500 text-right">
+          Schritt {currentStepForProgress} von {totalSteps}
+        </p>
+      </div>
 
-              <label>Ø Gäste pro Reservierung</label>
-              <input type="number" name="avgGuestsPerReservation" value={formData.avgGuestsPerReservation} onChange={handleChange} required className="w-full border p-2 mb-4" />
+      {/* Schritt 1: Basisangaben – Reservierungen & No-Shows (Personen) */}
+      {!showResult && step === 1 && (
+        <>
+          <h2 className="text-2xl font-bold mb-2">
+            Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen
+            Reservierungen.
+          </p>
 
-              <label>No-Shows in den letzten 30 Tagen</label>
-              <input type="number" name="noShowsLast30Days" value={formData.noShowsLast30Days} onChange={handleChange} required className="w-full border p-2 mb-4" />
-            </div>
+          {/* 1. Ø Reservierungen pro Öffnungstag */}
+          {renderField(
+            'reservationsPerDay',
+            'Ø Reservierungen pro Öffnungstag (z. B. 40)',
+            'number'
           )}
 
-          {step === 2 && (
-            <div>
-              <label>Restaurant-Typ</label>
-              <select name="restaurantType" value={formData.restaurantType} onChange={handleChange} required className="w-full border p-2 mb-4">
-                <option value="">Bitte wählen</option>
-                <option value="à la carte">à la carte</option>
-                <option value="Casual Dining">Casual Dining</option>
-                <option value="Fine Dining">Fine Dining</option>
-                <option value="Hotelrestaurant">Hotelrestaurant</option>
-                <option value="Systemgastronomie">Systemgastronomie</option>
-              </select>
+          {/* 2. Ø Gäste pro Reservierung – Slider */}
+          <div className="mb-10">
+            <label className="block text-sm font-medium text-gray-700 mb-4">
+              Ø Gäste pro Reservierung (z. B. 2,0)
+            </label>
 
-              <label>Anzahl Tage pro Woche geöffnet</label>
-              <input type="number" min="1" max="7" name="openDaysPerWeek" value={formData.openDaysPerWeek} onChange={handleChange} required className="w-full border p-2 mb-4" />
+            <div className="relative w-full">
+              {/* Value Bubble */}
+              <div
+                className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
+                style={{
+                  left: `${avgGuestsPercent}%`,
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                {avgGuestsSliderValue}
+              </div>
 
-              <label>Umsatz pro Gast (€)</label>
-              <input type="number" min="1" max="500" name="revenuePerGuest" value={formData.revenuePerGuest} onChange={handleChange} required className="w-full border p-2 mb-4" />
-
-              <label>Ist ein Online-Reservierungssystem im Einsatz?</label>
-              <select name="hasOnlineReservation" value={formData.hasOnlineReservation} onChange={handleChange} required className="w-full border p-2 mb-4">
-                <option value="">Bitte wählen</option>
-                <option value="Ja">Ja</option>
-                <option value="Nein">Nein</option>
-              </select>
+              {/* Pink Slider */}
+              <input
+                type="range"
+                name="avgGuestsPerReservation"
+                min="1"
+                max="8"
+                step="0.5"
+                value={avgGuestsSliderValue}
+                onChange={handleChange}
+                className="pink-slider"
+              />
             </div>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Die meisten Restaurants liegen zwischen 2,0 und 3,0 Gästen pro Reservierung.
+            </p>
+            {formErrors.avgGuestsPerReservation && (
+              <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
+            )}
+          </div>
+
+          {/* 3. No-Shows in Personen */}
+          {renderField(
+            'noShowGuestsLast30Days',
+            'Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung nicht erschienen (Schätzung)?',
+            'number'
           )}
 
-          {step === 3 && formData.hasOnlineReservation === 'Ja' && (
-            <div>
-              <label>Welches Reservierungssystem?</label>
-              <select name="reservationTool" value={formData.reservationTool} onChange={handleChange} required className="w-full border p-2 mb-4">
-                <option value="">Bitte wählen</option>
-                <option value="aleno">aleno</option>
-                <option value="CentralPlanner">CentralPlanner</option>
-                <option value="Formitable">Formitable</option>
-                <option value="Foratable">Foratable</option>
-                <option value="Gastronovi">Gastronovi</option>
-                <option value="OpenTable">OpenTable</option>
-                <option value="Quandoo">Quandoo</option>
-                <option value="Resmio">Resmio</option>
-                <option value="Seatris">Seatris</option>
-                <option value="Tablein">Tablein</option>
-                <option value="The Fork">The Fork</option>
-                <option value="Zenchef">Zenchef</option>
-                <option value="ein anderes">ein anderes</option>
-              </select>
-
-              {formData.reservationTool === 'ein anderes' && (
-                <input type="text" name="customReservationTool" placeholder="Bitte angeben" value={formData.customReservationTool} onChange={handleChange} className="w-full border p-2 mb-4" />
-              )}
-
-              <label>Werden No-Show-Gebühren erhoben?</label>
-              <select name="chargesNoShowFee" value={formData.chargesNoShowFee} onChange={handleChange} required className="w-full border p-2 mb-4">
-                <option value="">Bitte wählen</option>
-                <option value="Ja">Ja</option>
-                <option value="Nein">Nein</option>
-              </select>
-
-              {formData.chargesNoShowFee === 'Ja' && (
-                <input type="number" name="noShowFee" value={formData.noShowFee} onChange={handleChange} placeholder="No-Show-Gebühr pro Gast (€)" required className="w-full border p-2 mb-4" />
-              )}
-            </div>
-          )}
-
-          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
-            {step < 3 || (step === 3 && formData.hasOnlineReservation === 'Ja') ? 'Weiter' : 'Auswertung anzeigen'}
+          <button
+            type="button"
+            onClick={goFromStep1}
+            className="mt-6 bg-pink-500 text-white px-8 py-3 rounded-full font-semibold"
+          >
+            Weiter
           </button>
-        </form>
+        </>
       )}
 
+      {/* Schritt 2: Restaurant & Wirtschaftlichkeit + Online-Reservierung */}
+      {!showResult && step === 2 && (
+        <>
+          <h2 className="text-xl font-bold mb-4">Angaben zu deinem Restaurant</h2>
+
+          {renderField(
+            'restaurantType',
+            'Um welche Art von Restaurant handelt es sich?',
+            'text',
+            restaurantTypeOptions
+          )}
+
+          {renderField(
+            'openDays',
+            'Anzahl Tage pro Woche geöffnet (z. B. 5)',
+            'number'
+          )}
+
+          {/* Ø Umsatz pro Gast – Slider bis 500 € */}
+          <div className="mb-10">
+            <label className="block text-sm font-medium text-gray-700 mb-4">
+              Ø Umsatz pro Gast ({currency})
+            </label>
+
+            <div className="relative w-full">
+              {/* Value Bubble */}
+              <div
+                className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
+                style={{
+                  left: `${avgSpendPercent}%`,
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                {avgSpendSliderValue} {currency}
+              </div>
+
+              {/* Pink Slider */}
+              <input
+                type="range"
+                name="averageSpend"
+                min="10"
+                max="500"
+                step="5"
+                value={avgSpendSliderValue}
+                onChange={handleChange}
+                className="pink-slider"
+              />
+            </div>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Schätzung reicht aus – nimm den durchschnittlichen Bon inklusive Getränke.
+            </p>
+            {formErrors.averageSpend && (
+              <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
+            )}
+          </div>
+
+          {renderField(
+            'hasOnlineReservation',
+            'Ist für das Restaurant ein Online-Reservierungssystem im Einsatz?',
+            'text',
+            ['', 'Ja', 'Nein']
+          )}
+
+          <div className="flex justify-between mt-4">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="bg-gray-200 px-4 py-2 rounded-full"
+            >
+              Zurück
+            </button>
+            <button
+              type="button"
+              onClick={goFromStep2}
+              className="bg-pink-500 text-white px-4 py-2 rounded-full"
+            >
+              Weiter
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Schritt 3: Details zum Reservierungssystem (nur falls Ja) */}
+      {!showResult && step === 3 && formData.hasOnlineReservation === 'Ja' && (
+        <>
+          <h2 className="text-xl font-bold mb-4">Details zum Reservierungssystem</h2>
+
+          {renderField(
+            'reservationTool',
+            'Welches Reservierungssystem ist aktuell im Einsatz?',
+            'text',
+            reservationToolOptions
+          )}
+
+          {renderField(
+            'feeForNoShow',
+            'Werden No-Show-Gebühren erhoben?',
+            'text',
+            ['', 'Ja', 'Nein']
+          )}
+
+          {formData.feeForNoShow === 'Ja' &&
+            renderField(
+              'noShowFee',
+              `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`,
+              'number'
+            )}
+
+          <div className="flex justify-between mt-4">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="bg-gray-200 px-4 py-2 rounded-full"
+            >
+              Zurück
+            </button>
+            <button
+              type="button"
+              onClick={goFromStep3}
+              className="bg-green-600 text-white px-4 py-2 rounded-full"
+            >
+              Auswertung anzeigen
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Ergebnisbereich */}
       {showResult && (
-        <div className="mt-8">
-          <h2 className="text-xl font-bold mb-4">Deine Auswertung</h2>
+        <>
+          <h2 className="text-2xl font-bold text-center mb-6">Deine Auswertung</h2>
 
-          <div className="bg-black text-white p-4 rounded mb-4">
-            <p className="text-lg font-semibold">No-Show-Rate (30 Tage): {calculateNoShowRate()}</p>
+          <div className="grid gap-4 sm:grid-cols-2 mb-8">
+            {/* No-Show-Rate */}
+            <div className="bg-black text-white p-6 rounded-xl text-center">
+              <h3 className="text-sm mb-1">No-Show-Rate (30 Tage)</h3>
+              <p className="text-3xl font-semibold">{noShowRate.toFixed(1)}%</p>
+            </div>
+
+            {/* No-Show-Verlust */}
+            <div className="bg-black text-white p-6 rounded-xl text-center">
+              <h3 className="text-sm mb-1">Umsatzverlust durch No-Shows (30 Tage)</h3>
+              <p className="text-3xl font-semibold">
+                {format(loss30)} {currency}
+              </p>
+            </div>
           </div>
-          <div className="bg-black text-white p-4 rounded mb-4">
-            <p className="text-lg font-semibold">No-Show-Verlust (30 Tage): {calculateLoss()} €</p>
-          </div>
 
-          <button onClick={() => setShowContactForm(true)} className="bg-green-600 text-white px-4 py-2 rounded">
-            Ja, PDF-Report erhalten
-          </button>
+          {/* Call to Action */}
+          {showForm && (
+            <div className="text-center mt-6">
+              <p className="mb-4 font-medium">
+                Möchtest du eine detaillierte Auswertung als PDF inkl. konkreter Handlungsempfehlungen
+                für dein Restaurant erhalten?
+              </p>
 
-          {showContactForm && (
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-2">Kontaktdaten</h3>
-              <input type="text" name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Vorname" required className="w-full border p-2 mb-2" />
-              <input type="text" name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Nachname" required className="w-full border p-2 mb-2" />
-              <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Business-Email" pattern="^[\w.%+-]+@(?:[\w-]+\.)+(?:com|org|de|ch|at)$" required className="w-full border p-2 mb-2" />
-              <input type="text" name="restaurantName" value={formData.restaurantName} onChange={handleChange} placeholder="Name des Restaurants" required className="w-full border p-2 mb-2" />
+              <button
+                type="button"
+                onClick={() => setShowContactForm(true)}
+                className="bg-pink-500 text-white px-8 py-3 rounded-full font-semibold"
+              >
+                Ja, PDF-Report erhalten
+              </button>
             </div>
           )}
-        </div>
+
+          {/* Kontaktformular */}
+          {showContactForm && !submissionSuccess && (
+            <form
+              ref={contactFormRef}
+              onSubmit={handleSubmit}
+              className="space-y-4 mt-8 border-t border-gray-200 pt-6"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <input
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  placeholder="Vorname"
+                  className="border border-gray-300 p-2 rounded w-full"
+                  required
+                />
+                <input
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Nachname"
+                  className="border border-gray-300 p-2 rounded w-full"
+                  required
+                />
+              </div>
+
+              <input
+                name="restaurantName"
+                value={formData.restaurantName}
+                onChange={handleChange}
+                placeholder="Name des Restaurants"
+                className="border border-gray-300 p-2 rounded w-full"
+                required
+              />
+
+              <div>
+                <input
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  type="email"
+                  placeholder="Business-E-Mail-Adresse"
+                  className="border border-gray-300 p-2 rounded w-full"
+                  required
+                />
+                {emailError && (
+                  <p className="text-red-600 text-sm mt-1">{emailError}</p>
+                )}
+              </div>
+
+              <div className="flex items-start">
+                <input
+                  id="policy"
+                  name="policy"
+                  type="checkbox"
+                  checked={acceptedPolicy}
+                  onChange={(e) => {
+                    setAcceptedPolicy(e.target.checked);
+                    if (e.target.checked) setShowPolicyError(false);
+                  }}
+                  className="mr-2 mt-1"
+                />
+                <label htmlFor="policy" className="text-sm text-gray-700">
+                  Ich bin mit der Verarbeitung meiner Daten und der Zusendung des Reports per E-Mail
+                  einverstanden und habe die{' '}
+                  <a
+                    href="https://www.aleno.me/de/datenschutz"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    Datenschutzerklärung
+                  </a>{' '}
+                  gelesen.
+                </label>
+              </div>
+
+              {showPolicyError && (
+                <p className="text-red-600 text-sm">
+                  Bitte bestätige die Datenschutzerklärung.
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="bg-pink-500 text-white px-8 py-3 rounded-full w-full disabled:opacity-60"
+                disabled={submissionStatus === 'submitting'}
+              >
+                {submissionStatus === 'submitting' ? 'Wird gesendet…' : 'PDF-Report anfordern'}
+              </button>
+
+              {submissionStatus === 'error' && (
+                <p className="text-red-600 text-sm mt-2">
+                  Fehler beim Senden. Bitte versuche es später erneut.
+                </p>
+              )}
+            </form>
+          )}
+
+          {/* Erfolgsmeldung */}
+          {submissionSuccess && (
+            <div className="text-center bg-green-100 border border-green-300 p-6 rounded-xl mt-6">
+              <h2 className="text-xl font-semibold mb-2 text-green-800">Vielen Dank!</h2>
+              <p className="text-green-700">
+                Dein No-Show-Report wurde erfolgreich per E-Mail versendet.
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
