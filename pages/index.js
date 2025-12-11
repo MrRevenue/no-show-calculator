@@ -352,7 +352,7 @@ export default function NoShowCalculator() {
         <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
       )}
       <p className="text-xs text-gray-500 mt-1">
-        Wie viele Reservierungen hast du an einem typischen Öffnungstag im Durchschnitt – egal ob
+        Wie viele Reservierungen (also nicht Anzahl Gäste) hast du an einem typischen Öffnungstag im Durchschnitt – egal ob
         online, telefonisch oder per E-Mail?
       </p>
     </div>
