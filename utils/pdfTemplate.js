@@ -139,7 +139,7 @@ export function generatePdf(formData) {
   // Kachel 1: No-Show-Rate
   doc
     .save()
-    .roundedRectangle(kpiXLeft, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
+    .roundedRect(kpiXLeft, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
     .fill(colorBlack);
 
   doc
@@ -159,7 +159,7 @@ export function generatePdf(formData) {
   // Kachel 2: Umsatzverlust
   doc
     .save()
-    .roundedRectangle(kpiXRight, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
+    .roundedRect(kpiXRight, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
     .fill(colorBlack);
 
   doc
@@ -209,7 +209,7 @@ export function generatePdf(formData) {
     // Linke Kachel: Heute (schwarz / dunkel)
     doc
       .save()
-      .roundedRectangle(compXLeft, compY, compBoxWidth, compBoxHeight, 10)
+      .roundedRect(compXLeft, compY, compBoxWidth, compBoxHeight, 10)
       .fill(colorDark);
 
     doc
@@ -248,7 +248,7 @@ export function generatePdf(formData) {
     // Rechte Kachel: Mit aleno (pink)
     doc
       .save()
-      .roundedRectangle(compXRight, compY, compBoxWidth, compBoxHeight, 10)
+      .roundedRect(compXRight, compY, compBoxWidth, compBoxHeight, 10)
       .fill(colorPink);
 
     doc
@@ -377,7 +377,7 @@ export function generatePdf(formData) {
 
   doc
     .save()
-    .roundedRectangle(
+    .roundedRect(
       marginLeft,
       promoY,
       contentWidth,
@@ -412,7 +412,7 @@ export function generatePdf(formData) {
   const btnY = promoY + promoBoxHeight - btnHeight - 10;
 
   doc
-    .roundedRectangle(btnX, btnY, btnWidth, btnHeight, 9)
+    .roundedRect(btnX, btnY, btnWidth, btnHeight, 9)
     .fill(colorPink);
 
   doc

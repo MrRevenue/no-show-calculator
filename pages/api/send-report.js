@@ -1,82 +1,274 @@
+import PDFDocument from 'pdfkit';
 
-import nodemailer from 'nodemailer';
-import { PassThrough } from 'stream';
-import { generatePdf } from '../../utils/pdfTemplate';
+export function generatePdf(formData) {
+  const doc = new PDFDocument({ margin: 50 });
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
+  const get = (key) => formData[key] || '–';
 
-  console.log("📩 Anfrage empfangen:", req.body);
+  const colorDark = '#111827';
+  const colorBlack = '#000000';
+  const colorPink = '#ff2e92';
+  const colorText = '#111827';
 
-  const {
-    firstName, lastName, email, mobile,
-    country, restaurantType, seats, guestsPerDay,
-    openDays, guestReservationRate, averageSpend,
-    noShowGuestsLast30Days, hasOnlineReservation,
-    reservationTool, reservationRate, feeForNoShow,
-    noShowFee, waitlist
-  } = req.body;
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const marginLeft = doc.page.margins.left;
+  const marginRight = doc.page.margins.right;
+  const contentWidth = pageWidth - marginLeft - marginRight;
 
-  if (!email) {
-    console.error("❌ Kein Empfänger angegeben.");
-    return res.status(400).json({ success: false, error: 'Empfängeradresse fehlt' });
-  }
+  const calculated = formData.calculated || {};
 
-  try {
-    const doc = generatePdf(req.body);
-    const buffer = [];
+  const rawNoShowRate =
+    typeof calculated.noShowRate === 'number'
+      ? calculated.noShowRate
+      : Number(calculated.noShowRate || 0);
 
-    const stream = doc.pipe(new PassThrough());
-    stream.on('data', chunk => buffer.push(chunk));
-    stream.on('end', async () => {
-      const pdfBuffer = Buffer.concat(buffer);
-      console.log("📄 PDF erstellt. Größe:", pdfBuffer.length);
+  const noShowRate = Number.isFinite(rawNoShowRate)
+    ? rawNoShowRate.toFixed(1)
+    : '0.0';
 
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: 'olaf.kunz@aleno.me',
-          pass: 'harz asec nrax kuuj'
-        }
-      });
+  const loss30 =
+    typeof calculated.loss30 === 'number'
+      ? calculated.loss30
+      : Number(calculated.loss30 || 0);
 
-      try {
-        await transporter.sendMail({
-          from: '"No-Show Report" <olaf.kunz@aleno.me>',
-          to: email,
-          cc: ['marketing@aleno.me'],
-          subject: 'Dein No-Show-Report',
-          text: `Hallo ${firstName},
+  const totalRevenue30 =
+    typeof calculated.totalRevenue30 === 'number'
+      ? calculated.totalRevenue30
+      : Number(calculated.totalRevenue30 || 0);
 
-im Anhang findest du deinen No-Show-Report.
+  const currency =
+    formData.country === 'Schweiz' ||
+    formData.country === 'Switzerland' ||
+    formData.currency === 'CHF'
+      ? 'CHF'
+      : '€';
 
-Wenn du verlässliche Buchungen erhalten und obendrein deine Umsätze deutlich steigern möchtest, dann lass dir zeigen, was mit aleno möglich ist.
+  const formatCurrency = (val) =>
+    Math.round(Number(val || 0)).toLocaleString('de-DE');
 
-Buche hier eine kostenlose Online-Demo: https://www.aleno.me/de/demo.
+  const restaurantName =
+    get('restaurantName') !== '–' ? get('restaurantName') : 'dein Restaurant';
 
-Herzlichen Gruss
-Olaf`,
-          attachments: [
-            {
-              filename: 'no-show-report.pdf',
-              content: pdfBuffer
-            }
-          ]
-        });
+  // Vergleichs-Szenario
+  const currentLoss = Math.max(loss30, 0);
+  const targetNoShowRateDecimal = 0.003;
 
-        console.log("📬 Mail erfolgreich an", email, "versendet.");
-        return res.status(200).json({ success: true });
+  const lossAt0_3 =
+    totalRevenue30 > 0 ? totalRevenue30 * targetNoShowRateDecimal : 0;
 
-      } catch (sendErr) {
-        console.error("❌ Fehler beim Versand:", sendErr);
-        return res.status(500).json({ success: false, error: sendErr.message });
-      }
+  const avoidableLoss = Math.max(currentLoss - lossAt0_3, 0);
+  const revenueToday = Math.max(totalRevenue30 - currentLoss, 0);
+  const revenueWithAlenoBase = Math.max(totalRevenue30 - lossAt0_3, 0);
+  const extraUpside15 = revenueWithAlenoBase * 0.15;
+  const revenueWithAlenoPlus15 = revenueWithAlenoBase + extraUpside15;
+
+  const hasOnline = get('hasOnlineReservation');
+  const reservationToolRaw = get('reservationTool');
+  const reservationTool =
+    typeof reservationToolRaw === 'string'
+      ? reservationToolRaw.toLowerCase()
+      : '';
+  const usesAleno =
+    hasOnline === 'Ja' &&
+    reservationTool.replace(/\s+/g, '').includes('aleno');
+  const showComparisonTiles = !usesAleno && totalRevenue30 > 0;
+
+  // ---------------- TITEL ----------------
+  doc
+    .fontSize(22)
+    .fillColor(colorDark)
+    .text(`No-Show-Report für ${restaurantName}`, {
+      align: 'left'
     });
 
-  } catch (err) {
-    console.error("❌ Allgemeiner Fehler:", err);
-    return res.status(500).json({ success: false, error: err.message });
+  doc.moveDown(0.4);
+  doc
+    .fontSize(11)
+    .fillColor('#4b5563')
+    .text(
+      'Basierend auf deinen Angaben haben wir deine No-Show-Quote und den Umsatzverlust durch nicht erschienene Gäste für die letzten 30 Tage berechnet.',
+      { align: 'left' }
+    );
+
+  doc.moveDown(1);
+
+  // ---------------- KPI-KACHELN ----------------
+  const kpiBoxGap = 16;
+  const kpiBoxWidth = (contentWidth - kpiBoxGap) / 2;
+  const kpiBoxHeight = 70;
+  const kpiXLeft = marginLeft;
+  const kpiXRight = marginLeft + kpiBoxWidth + kpiBoxGap;
+  const kpiY = doc.y + 5;
+
+  // Achtung: pdfkit heißt roundedRect, nicht roundedRectangle!
+  doc
+    .save()
+    .roundedRect(kpiXLeft, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
+    .fill(colorBlack);
+
+  doc
+    .fillColor('#ffffff')
+    .fontSize(10)
+    .text('No-Show-Rate (30 Tage)', kpiXLeft + 14, kpiY + 12, {
+      width: kpiBoxWidth - 28
+    });
+
+  doc
+    .fontSize(22)
+    .text(`${noShowRate} %`, kpiXLeft + 14, kpiY + 32, {
+      width: kpiBoxWidth - 28
+    })
+    .restore();
+
+  doc
+    .save()
+    .roundedRect(kpiXRight, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
+    .fill(colorBlack);
+
+  doc
+    .fillColor('#ffffff')
+    .fontSize(10)
+    .text(
+      'Umsatzverlust durch No-Shows (30 Tage)',
+      kpiXRight + 14,
+      kpiY + 12,
+      {
+        width: kpiBoxWidth - 28
+      }
+    );
+
+  doc
+    .fontSize(22)
+    .text(`${formatCurrency(currentLoss)} ${currency}`, kpiXRight + 14, kpiY + 32, {
+      width: kpiBoxWidth - 28
+    })
+    .restore();
+
+  doc.y = kpiY + kpiBoxHeight + 24;
+
+  // ---------------- Vergleichskacheln ----------------
+  if (showComparisonTiles) {
+    doc
+      .fontSize(14)
+      .fillColor(colorDark)
+      .text('Potenzial für dein Restaurant', { align: 'left' });
+
+    doc.moveDown(0.4);
+    doc
+      .fontSize(10)
+      .fillColor('#4b5563')
+      .text(
+        'So entwickelt sich dein Reservierungsumsatz, wenn du deine No-Show-Rate auf < 0,3 % senkst und zusätzlich 15 % mehr Umsatz pro reserviertem Gast erzielst.',
+        { align: 'left' }
+      );
+
+    doc.moveDown(0.8);
+
+    const compBoxGap = 16;
+    const compBoxWidth = (contentWidth - compBoxGap) / 2;
+    const compBoxHeight = 120;
+    const compXLeft = marginLeft;
+    const compXRight = marginLeft + compBoxWidth + compBoxGap;
+    const compY = doc.y;
+
+    // Heute
+    doc
+      .save()
+      .roundedRect(compXLeft, compY, compBoxWidth, compBoxHeight, 10)
+      .fill(colorDark);
+
+    doc
+      .fillColor('#ffffff')
+      .fontSize(10)
+      .text('Heute (bei dir aktuell)', compXLeft + 16, compY + 14, {
+        width: compBoxWidth - 32
+      });
+
+    doc
+      .fontSize(11)
+      .text(
+        `No-Show-Quote: ${noShowRate} %`,
+        compXLeft + 16,
+        compY + 36,
+        { width: compBoxWidth - 32 }
+      );
+    doc.text(
+      `Gesamtumsatz mit Reservierungen (30 Tage):`,
+      compXLeft + 16,
+      compY + 54,
+      { width: compBoxWidth - 32 }
+    );
+    doc
+      .fontSize(14)
+      .text(
+        `${formatCurrency(totalRevenue30)} ${currency}`,
+        compXLeft + 16,
+        compY + 72,
+        { width: compBoxWidth - 32 }
+      );
+
+    doc.restore();
+
+    // Mit aleno
+    doc
+      .save()
+      .roundedRect(compXRight, compY, compBoxWidth, compBoxHeight, 10)
+      .fill(colorPink);
+
+    doc
+      .fillColor('#ffffff')
+      .fontSize(10)
+      .text('Mit aleno', compXRight + 16, compY + 14, {
+        width: compBoxWidth - 32
+      });
+
+    doc
+      .fontSize(11)
+      .text(
+        'No-Show-Quote: < 0,3 %',
+        compXRight + 16,
+        compY + 36,
+        { width: compBoxWidth - 32 }
+      );
+
+    doc.text(
+      'Gesamtumsatz mit Reservierungen (30 Tage):',
+      compXRight + 16,
+      compY + 54,
+      { width: compBoxWidth - 32 }
+    );
+
+    doc
+      .fontSize(14)
+      .text(
+        `${formatCurrency(revenueWithAlenoPlus15)} ${currency}`,
+        compXRight + 16,
+        compY + 72,
+        { width: compBoxWidth - 32 }
+      );
+
+    const avoidable = formatCurrency(avoidableLoss);
+    const extra = formatCurrency(extraUpside15);
+
+    doc
+      .fontSize(9)
+      .text(
+        `davon ca. ${avoidable} ${currency} weniger No-Show-Verlust und ${extra} ${currency} zusätzliches Umsatzpotenzial`,
+        compXRight + 16,
+        compY + 94,
+        { width: compBoxWidth - 32 }
+      );
+
+    doc.restore();
+
+    doc.y = compY + compBoxHeight + 24;
   }
+
+  // ... (Benchmark, Tipps, aleno-Box, Zusammenfassung wie vorher – hier kannst du
+  // meinen letzten Vorschlag weiterverwenden, nur überall `roundedRect` statt
+  // `roundedRectangle` benutzen und KEINE Streams im pdfTemplate selbst.)
+
+  doc.end();
+  return doc;
 }
