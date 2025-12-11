@@ -1,10 +1,7 @@
 import PDFDocument from 'pdfkit';
-import { PassThrough } from 'stream';
 
 export function generatePdf(formData) {
   const doc = new PDFDocument({ margin: 50 });
-  const stream = new PassThrough();
-  doc.pipe(stream);
 
   const get = (key) => formData[key] || '–';
 
@@ -70,10 +67,9 @@ export function generatePdf(formData) {
   const currentLoss = Math.max(loss30, 0);
 
   // angenommene No-Show-Rate mit aleno: 0,3 % (0.003)
-  // idealer Umsatz bei 0,3 % No-Shows (vereinfachte Annahme)
   const targetNoShowRateDecimal = 0.003;
 
-  // Wir approximieren den Verlust bei 0,3 % No-Show über den Gesamtumsatz:
+  // Verlust bei 0,3 % No-Show über den Gesamtumsatz approximiert
   const lossAt0_3 =
     totalRevenue30 > 0
       ? totalRevenue30 * targetNoShowRateDecimal
@@ -171,9 +167,14 @@ export function generatePdf(formData) {
 
   doc
     .fontSize(22)
-    .text(`${formatCurrency(currentLoss)} ${currency}`, kpiXRight + 14, kpiY + 32, {
-      width: kpiBoxWidth - 28
-    })
+    .text(
+      `${formatCurrency(currentLoss)} ${currency}`,
+      kpiXRight + 14,
+      kpiY + 32,
+      {
+        width: kpiBoxWidth - 28
+      }
+    )
     .restore();
 
   // Cursor unterhalb der Kacheln positionieren
@@ -392,9 +393,14 @@ export function generatePdf(formData) {
   doc
     .fillColor('#ffffff')
     .fontSize(13)
-    .text('aleno – der digitale Assistent für Restaurants & Hotels', promoInnerX, promoY + 14, {
-      width: promoInnerWidth
-    });
+    .text(
+      'aleno – der digitale Assistent für Restaurants & Hotels',
+      promoInnerX,
+      promoY + 14,
+      {
+        width: promoInnerWidth
+      }
+    );
 
   doc
     .fontSize(9.5)
@@ -426,6 +432,7 @@ export function generatePdf(formData) {
 
   doc.restore();
 
+  // WICHTIG: Stream beenden und zurückgeben
   doc.end();
   return doc;
 }
