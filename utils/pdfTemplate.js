@@ -11,21 +11,20 @@ export function generatePdf(formData) {
   });
 
   // ------------------ Fonts (Poppins) ------------------
-const FONT_LIGHT = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Light.ttf');
-const FONT_REGULAR = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Regular.ttf');
-const FONT_SEMIBOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-SemiBold.ttf');
-const FONT_BOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Bold.ttf');
+  const FONT_LIGHT = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Light.ttf');
+  const FONT_REGULAR = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Regular.ttf');
+  const FONT_SEMIBOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-SemiBold.ttf');
+  const FONT_BOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Bold.ttf');
 
-doc.registerFont('Poppins-Light', FONT_LIGHT);
-doc.registerFont('Poppins', FONT_REGULAR);
-doc.registerFont('Poppins-SemiBold', FONT_SEMIBOLD);
-doc.registerFont('Poppins-Bold', FONT_BOLD);
+  doc.registerFont('Poppins-Light', FONT_LIGHT);
+  doc.registerFont('Poppins', FONT_REGULAR);
+  doc.registerFont('Poppins-SemiBold', FONT_SEMIBOLD);
+  doc.registerFont('Poppins-Bold', FONT_BOLD);
 
-// 👉 Standard-Font global setzen
-doc.font('Poppins-Light');
+  // 👉 Standard-Font global setzen (auch Titel)
+  doc.font('Poppins-Light');
 
-
-  const get = (key) => formData?.[key] ?? '–';
+  const get = (key) => formData?.[key] ?? '-';
 
   // ------------------ Farben (wie gewünscht) ------------------
   const COLOR_DARK = '#282731';
@@ -92,7 +91,7 @@ doc.font('Poppins-Light');
   const revenueWithAlenoPlus15 = revenueWithAlenoBase + extraUpside15;
 
   const restaurantName =
-    get('restaurantName') !== '–' && String(get('restaurantName')).trim()
+    get('restaurantName') !== '-' && String(get('restaurantName')).trim()
       ? String(get('restaurantName')).trim()
       : 'dein Restaurant';
 
@@ -124,10 +123,10 @@ doc.font('Poppins-Light');
   // Titel
   doc
     .fillColor(COLOR_WHITE)
-    .font('Helvetica')
+    .font('Poppins-Light')
     .fontSize(56)
     .text(
-      `No-Show-Report\nfür das Restaurant\n„${restaurantName}“`,
+      `No-Show-Report\nfür das Restaurant\n"${restaurantName}"`,
       55,
       270,
       { width: coverW * 0.55, lineGap: 6 }
@@ -136,7 +135,7 @@ doc.font('Poppins-Light');
   // Untertitel
   doc
     .fillColor(COLOR_SUB)
-    .font('Helvetica')
+    .font('Poppins-Light')
     .fontSize(26)
     .text('Zahlen, Vergleiche, Tipps', 55, 540, { width: coverW * 0.55 });
 
@@ -184,19 +183,24 @@ doc.font('Poppins-Light');
   const drawKpiTile = ({ x, y, w, h, title, value, bg = COLOR_BLACK, fg = COLOR_WHITE }) => {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).fill(bg);
-    doc.fillColor(fg).font('Helvetica-Bold').fontSize(16)
+
+    doc.fillColor(fg).font('Poppins-Light').fontSize(16)
       .text(title, x + 24, y + 22, { width: w - 48, align: 'center' });
-    doc.fillColor(fg).font('Helvetica-Bold').fontSize(40)
+
+    doc.fillColor(fg).font('Poppins-Bold').fontSize(40)
       .text(value, x + 24, y + 58, { width: w - 48, align: 'center' });
+
     doc.restore();
   };
 
   const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).lineWidth(2).stroke(COLOR_BLACK);
-    doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(18)
+
+    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18)
       .text(title, x + 22, y + 20, { width: w - 44, align: 'left' });
-    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14);
+
+    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14);
 
     let cy = y + 58;
     for (const ln of lines) {
@@ -209,20 +213,22 @@ doc.font('Poppins-Light');
   const drawBigCompareTile = ({ x, y, w, h, bg, header, items, footerNote }) => {
     doc.save();
     doc.roundedRect(x, y, w, h, 16).fill(bg);
-    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(18)
+
+    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(18)
       .text(header, x + 26, y + 22, { width: w - 52 });
 
     let cy = y + 64;
-    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(16);
+    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(16);
+
     for (const { label, value } of items) {
-      doc.font('Helvetica-Bold').text(label, x + 26, cy, { width: w - 52 });
-      doc.font('Helvetica').text(value, x + 26, cy + 18, { width: w - 52 });
+      doc.font('Poppins-SemiBold').text(label, x + 26, cy, { width: w - 52 });
+      doc.font('Poppins-Light').text(value, x + 26, cy + 18, { width: w - 52 });
       cy += 54;
       if (cy > y + h - 80) break;
     }
 
     if (footerNote) {
-      doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(10)
+      doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(10)
         .text(footerNote, x + 26, y + h - 48, { width: w - 52 });
     }
 
@@ -232,16 +238,18 @@ doc.font('Poppins-Light');
   const drawCTAButton = ({ x, y, w, h, text, link }) => {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).fill(COLOR_PINK);
-    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(14)
+
+    doc.fillColor(COLOR_WHITE).font('Poppins-SemiBold').fontSize(14)
       .text(text, x, y + 10, { width: w, align: 'center', link });
+
     doc.restore();
   };
 
   const drawCheckBullet = ({ x, y, text }) => {
     doc.save();
     doc.fillColor(COLOR_PINK).circle(x + 6, y + 8, 6).fill();
-    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(10).text('✓', x + 3, y + 2);
-    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(13).text(text, x + 20, y, { width: contentW - 40 });
+    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(10).text('✓', x + 3, y + 2);
+    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(13).text(text, x + 20, y, { width: contentW - 40 });
     doc.restore();
   };
 
@@ -252,10 +260,10 @@ doc.font('Poppins-Light');
   // =============================================================
   // SEITE 2: Aktuelle No-Show-Situation
   // =============================================================
-  doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
+  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28)
     .text('Deine aktuelle No-Show-Situation', marginL, 50);
 
-  doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14)
+  doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14)
     .text(
       'Basierend auf deinen Angaben haben wir deine No-Show-Quote und den Umsatzverlust durch nicht erschienene Gäste für die letzten 30 Tage berechnet.',
       marginL,
@@ -291,13 +299,13 @@ doc.font('Poppins-Light');
 
   // Benchmark section
   const benchTitleY = tileY + tileH + 34;
-  doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(18)
+  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18)
     .text('Vergleichszahlen von Restaurants aus dem DACH-Raum', marginL, benchTitleY);
 
   // personalisierter Satz über/unter Durchschnitt (simple Einordnung)
   const avgDachMid = 15;
   const direction = noShowRate >= avgDachMid ? 'über' : 'unter';
-  doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(13)
+  doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(13)
     .text(`Deine No-Show-Rate liegt damit ${direction} dem Branchendurchschnitt.`, marginL, benchTitleY + 24);
 
   const benchY = benchTitleY + 62;
@@ -332,7 +340,7 @@ doc.font('Poppins-Light');
     lines: ['Ø No-Show-Rate', 'ca. 12–15 %']
   });
 
-  doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(10)
+  doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(10)
     .text('Quelle: Diese Zahlen sind aus aggregierten Branchenreports und Betreiberdaten.', marginL, benchY + benchH + 14);
 
   // =============================================================
@@ -341,10 +349,10 @@ doc.font('Poppins-Light');
   if (hasOtherTool) {
     ensureNewPage();
 
-    doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
+    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28)
       .text('Dein Potenzial', marginL, 50);
 
-    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14)
+    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14)
       .text(
         'So könnte sich dein Reservierungsumsatz entwickeln, wenn du deine No-Show-Rate auf < 0,3 % senkst und zusätzlich 15 % mehr Umsatz pro reserviertem Gast erzielst.',
         marginL,
@@ -391,7 +399,7 @@ doc.font('Poppins-Light');
         '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
     });
 
-    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(10)
+    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(10)
       .text(
         'Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.',
         marginL,
@@ -405,19 +413,19 @@ doc.font('Poppins-Light');
   // =============================================================
   ensureNewPage();
 
-  doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
+  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28)
     .text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
 
   const tipsX = marginL;
   let tipsY = 105;
 
   const tipTitle = (n, t) => {
-    doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(18).text(`${n}. ${t}`, tipsX, tipsY);
+    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18).text(`${n}. ${t}`, tipsX, tipsY);
     tipsY += 26;
   };
 
   const tipBody = (txt) => {
-    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14)
+    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14)
       .text(txt, tipsX, tipsY, { width: contentW });
     tipsY += 54;
   };
@@ -434,7 +442,7 @@ doc.font('Poppins-Light');
 
   tipTitle(3, 'Ticketing für Events und Specials');
   tipBody(
-    'Lass Gäste nicht nur reservieren, sondern direkt buchen – z. B. Chef’s Table: Gäste wählen im Reservierungsprozess ihr Menü und bezahlen im Voraus. Damit sicherst du dir Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste.'
+    'Lass Gäste nicht nur reservieren, sondern direkt buchen – z. B. Chef’s Table: Gäste wählen im Reservierungsprozess direkt ihr Menü und bezahlen im Voraus. Damit sicherst du dir Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste.'
   );
 
   tipTitle(4, 'Warteliste');
@@ -460,7 +468,7 @@ doc.font('Poppins-Light');
   doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
 
   // Titel
-  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(40)
+  doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(40)
     .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
 
   // Zwei Spalten Intro-Text
@@ -468,7 +476,7 @@ doc.font('Poppins-Light');
   const colW = (contentW - colGap) / 2;
   const colY = 165;
 
-  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(14)
+  doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(14)
     .text(
       'Der Digitale Assistent aleno ist eine smarte All-in-One-Lösung für Gästekommunikation, Tischreservierungen und Betriebsoptimierung in der Gastronomie.',
       marginL,
@@ -476,7 +484,7 @@ doc.font('Poppins-Light');
       { width: colW }
     );
 
-  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(14)
+  doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(14)
     .text(
       'Die Software unterstützt dabei, Abläufe zu automatisisieren, Auslastung zu steigern und Gäste durch personalisierte Erlebnisse langfristig zu binden.',
       marginL + colW + colGap,
@@ -493,20 +501,23 @@ doc.font('Poppins-Light');
   const pinkBox = (x, title, body) => {
     doc.save();
     doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
-    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(18)
+
+    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(18)
       .text(title, x + 18, pinkY + 16, { width: pinkW - 36 });
-    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(12)
+
+    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(12)
       .text(body, x + 18, pinkY + 42, { width: pinkW - 36 });
+
     doc.restore();
   };
 
-  pinkBox(marginL, '15% mehr Gäste', 'Die L’Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern.');
+  pinkBox(marginL, '15% mehr Gäste', "Die L'Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern.");
   pinkBox(marginL + pinkW + pinkGap, '< 0,5% No-Shows', 'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.');
   pinkBox(marginL + (pinkW + pinkGap) * 2, '5,2x ROI', 'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.');
 
   // Vorteile
   const vY = 385;
-  doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(20)
+  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20)
     .text('Deine Vorteile mit aleno:', marginL, vY);
 
   let by = vY + 34;
@@ -524,7 +535,7 @@ doc.font('Poppins-Light');
 
   // Masterplan
   const mY = by + 22;
-  doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(20)
+  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20)
     .text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
 
   let my = mY + 36;
@@ -535,10 +546,10 @@ doc.font('Poppins-Light');
   ];
 
   for (const item of master) {
-    doc.fillColor(COLOR_PINK).font('Helvetica-Bold').fontSize(14).text('•', marginL, my);
-    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(14)
+    doc.fillColor(COLOR_PINK).font('Poppins-Bold').fontSize(14).text('•', marginL, my);
+    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(14)
       .text(`${item.head}:`, marginL + 16, my, { continued: true });
-    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(14)
+    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(14)
       .text(` ${item.text}`, { width: contentW - 40 });
     my += 26;
   }
@@ -553,7 +564,6 @@ doc.font('Poppins-Light');
     link: 'https://www.aleno.me/de/demo'
   });
 
-  // Ende
   doc.end();
   return doc;
 }
