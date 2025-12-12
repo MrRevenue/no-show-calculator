@@ -162,18 +162,14 @@ export function generatePdf(formData) {
 
     doc.save();
 
-    doc
-      .polygon(
-        xTopLeft,
-        yTopLeft,     // oben links (linke Schräge)
-        coverW,
-        0,            // oben rechts
-        coverW,
-        coverH,       // unten rechts
-        xBottomLeft,
-        yBottomLeft   // unten links (untere Schräge)
-      )
-      .clip();
+doc
+  .polygon(
+    [xTopLeft, yTopLeft],
+    [coverW, 0],
+    [coverW, coverH],
+    [xBottomLeft, yBottomLeft]
+  )
+  .clip();
 
     // etwas größer platzieren, um keine Kanten zu riskieren
     doc.image(COVER_IMAGE, coverW * 0.58, 0, {
