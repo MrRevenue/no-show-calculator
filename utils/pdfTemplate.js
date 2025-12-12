@@ -1,53 +1,23 @@
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
 
 export function generatePdf(formData) {
-  const doc = new PDFDocument({ margin: 50 });
+  // A4 quer
+  const doc = new PDFDocument({
+    size: 'A4',
+    layout: 'landscape',
+    margin: 50
+  });
 
-  const get = (key) => formData[key] || '–';
+  const get = (key) => formData?.[key] ?? '–';
 
-  // ------------------ Farb- & Layout-Definitionen ------------------
-  const colorDark = '#111827';   // dunkler Hintergrund / Anlehnung Whitepaper
-  const colorBlack = '#000000';
-  const colorPink = '#ff2e92';
-  const colorText = '#111827';
-
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const marginLeft = doc.page.margins.left;
-  const marginRight = doc.page.margins.right;
-  const contentWidth = pageWidth - marginLeft - marginRight;
-
-  // ------------------ Berechnete Werte aus Frontend ------------------
-  const calculated = formData.calculated || {};
-
-  const rawNoShowRate =
-    typeof calculated.noShowRate === 'number'
-      ? calculated.noShowRate
-      : Number(calculated.noShowRate || 0);
-
-  const noShowRate = Number.isFinite(rawNoShowRate)
-    ? rawNoShowRate.toFixed(1)
-    : '0.0';
-
-  const loss30 =
-    typeof calculated.loss30 === 'number'
-      ? calculated.loss30
-      : Number(calculated.loss30 || 0);
-
-  const totalRevenue30 =
-    typeof calculated.totalRevenue30 === 'number'
-      ? calculated.totalRevenue30
-      : Number(calculated.totalRevenue30 || 0);
-
-  const totalGuests30 =
-    typeof calculated.totalGuests30 === 'number'
-      ? calculated.totalGuests30
-      : Number(calculated.totalGuests30 || 0);
-
-  const noShowGuests30 =
-    typeof calculated.noShowGuests30 === 'number'
-      ? calculated.noShowGuests30
-      : Number(calculated.noShowGuests30 || 0);
+  // ------------------ Farben (Whitepaper-Feeling) ------------------
+  const COLOR_DARK = '#111827';
+  const COLOR_PINK = '#ff2e92';
+  const COLOR_GRAY = '#4b5563';
+  const COLOR_BLACK = '#000000';
+  const COLOR_WHITE = '#ffffff';
 
   const currency =
     formData.country === 'Schweiz' ||
@@ -59,380 +29,464 @@ export function generatePdf(formData) {
   const formatCurrency = (val) =>
     Math.round(Number(val || 0)).toLocaleString('de-DE');
 
-  const restaurantName =
-    get('restaurantName') !== '–' ? get('restaurantName') : 'dein Restaurant';
+  // ------------------ Daten aus Frontend-Berechnung ------------------
+  const calculated = formData.calculated || {};
 
-  // ------------------ Vergleichs-Szenario "mit aleno" ------------------
-  // aktuelle Situation: Verlust durch No-Shows
-  const currentLoss = Math.max(loss30, 0);
+  const noShowRateNum = Number(
+    typeof calculated.noShowRate === 'number' ? calculated.noShowRate : calculated.noShowRate || 0
+  );
+  const noShowRate = Number.isFinite(noShowRateNum) ? noShowRateNum : 0;
 
-  // angenommene No-Show-Rate mit aleno: 0,3 % (0.003)
-  const targetNoShowRateDecimal = 0.003;
+  const loss30 = Number(
+    typeof calculated.loss30 === 'number' ? calculated.loss30 : calculated.loss30 || 0
+  );
 
-  // Verlust bei 0,3 % No-Show über den Gesamtumsatz approximiert
-  const lossAt0_3 =
-    totalRevenue30 > 0
-      ? totalRevenue30 * targetNoShowRateDecimal
-      : 0;
+  const totalRevenue30 = Number(
+    typeof calculated.totalRevenue30 === 'number' ? calculated.totalRevenue30 : calculated.totalRevenue30 || 0
+  );
 
-  const avoidableLoss = Math.max(currentLoss - lossAt0_3, 0);
+  const totalGuests30 = Number(
+    typeof calculated.totalGuests30 === 'number' ? calculated.totalGuests30 : calculated.totalGuests30 || 0
+  );
 
-  // heutiger realisierter Umsatz (vereinfacht: Potenzial minus Verlust)
-  const revenueToday = Math.max(totalRevenue30 - currentLoss, 0);
+  const noShowGuests30 = Number(
+    typeof calculated.noShowGuests30 === 'number' ? calculated.noShowGuests30 : calculated.noShowGuests30 || 0
+  );
 
-  // Umsatz mit aleno bei 0,3 % No-Shows
-  const revenueWithAlenoBase = Math.max(totalRevenue30 - lossAt0_3, 0);
+  const avgSpend = Number(formData.averageSpend || 0);
+  const noShowFeePerGuest =
+    formData.feeForNoShow === 'Ja' ? Number(formData.noShowFee || 0) : 0;
 
-  // 15 % zusätzlicher Upside auf Basis des aleno-Szenarios
-  const extraUpside15 = revenueWithAlenoBase * 0.15;
+  // Bruttopotenzial/Verlust-Logik (für Umsatzdarstellungen)
+  const grossLoss30 = Math.max(noShowGuests30 * avgSpend, 0);
+  const recoveredByFees30 = Math.max(noShowGuests30 * noShowFeePerGuest, 0);
+  const netLoss30 = Math.max(grossLoss30 - recoveredByFees30, 0); // sollte ≈ loss30 sein
+
+  // „Ist-Umsatz aus Reservierungen“ (vereinfachte Annahme: geplante Gäste - No-Show-Gäste)
+  const revenueActual30 = Math.max(totalRevenue30 - grossLoss30, 0);
+
+  // Zielwerte „mit aleno“
+  const TARGET_NOSHOW_RATE = 0.003; // 0.3 %
+  const targetGrossLoss = Math.max(totalRevenue30 * TARGET_NOSHOW_RATE, 0);
+  const avoidableLossGross = Math.max(grossLoss30 - targetGrossLoss, 0); // vermeidbarer Verlust (brutto)
+  const revenueWithAlenoBase = Math.max(revenueActual30 + avoidableLossGross, 0);
+  const extraUpside15 = Math.max(revenueWithAlenoBase * 0.15, 0);
   const revenueWithAlenoPlus15 = revenueWithAlenoBase + extraUpside15;
 
-  // ------------------ Bedingungen für Vergleichskacheln ------------------
-  const hasOnline = get('hasOnlineReservation');
-  const reservationToolRaw = get('reservationTool');
-  const reservationTool =
-    typeof reservationToolRaw === 'string'
-      ? reservationToolRaw.toLowerCase()
-      : '';
+  const restaurantName = (get('restaurantName') && get('restaurantName') !== '–')
+    ? String(get('restaurantName'))
+    : 'dein Restaurant';
 
-  const usesAleno =
-    hasOnline === 'Ja' &&
-    reservationTool.replace(/\s+/g, '').includes('aleno');
+  // ------------------ Bedingungen für Seite 3 ------------------
+  const hasOnline = String(get('hasOnlineReservation') || '');
+  const reservationToolRaw = String(get('reservationTool') || '');
+  const reservationTool = reservationToolRaw.toLowerCase().replace(/\s+/g, '');
+  const usesAleno = hasOnline === 'Ja' && reservationTool.includes('aleno');
+  const hasOtherTool = hasOnline === 'Ja' && reservationToolRaw && !usesAleno;
 
-  const showComparisonTiles = !usesAleno && totalRevenue30 > 0;
+  // ------------------ Layout Helpers ------------------
+  const pageW = doc.page.width;
+  const pageH = doc.page.height;
+  const marginL = doc.page.margins.left;
+  const marginT = doc.page.margins.top;
+  const marginR = doc.page.margins.right;
+  const marginB = doc.page.margins.bottom;
+  const contentW = pageW - marginL - marginR;
 
-  // -----------------------------------------------------------------------
-  // 1. Kopfbereich mit Titel
-  // -----------------------------------------------------------------------
-  doc
-    .fontSize(22)
-    .fillColor(colorDark)
-    .text(`No-Show-Report für ${restaurantName}`, {
-      align: 'left'
-    });
+  const drawKpiTile = ({ x, y, w, h, title, value, bg = COLOR_BLACK, fg = COLOR_WHITE }) => {
+    doc.save();
+    doc.roundedRect(x, y, w, h, 14).fill(bg);
+    doc.fillColor(fg).font('Helvetica-Bold').fontSize(16)
+      .text(title, x + 24, y + 22, { width: w - 48, align: 'center' });
+    doc.fillColor(fg).font('Helvetica-Bold').fontSize(40)
+      .text(value, x + 24, y + 58, { width: w - 48, align: 'center' });
+    doc.restore();
+  };
 
-  doc.moveDown(0.4);
-  doc
-    .fontSize(11)
-    .fillColor('#4b5563')
-    .text(
-      'Basierend auf deinen Angaben haben wir deine No-Show-Quote und den Umsatzverlust durch nicht erschienene Gäste für die letzten 30 Tage berechnet.',
-      { align: 'left' }
-    );
+  const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
+    doc.save();
+    doc.roundedRect(x, y, w, h, 14).lineWidth(2).stroke(COLOR_BLACK);
+    doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(18)
+      .text(title, x + 22, y + 20, { width: w - 44, align: 'left' });
+    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14);
 
-  doc.moveDown(1);
+    let cy = y + 58;
+    for (const ln of lines) {
+      doc.text(ln, x + 22, cy, { width: w - 44 });
+      cy += 22;
+    }
+    doc.restore();
+  };
 
-  // -----------------------------------------------------------------------
-  // 2. KPI-Zeile – zwei schwarze Kacheln (wie im Online-Rechner)
-  // -----------------------------------------------------------------------
-  const kpiBoxGap = 16;
-  const kpiBoxWidth = (contentWidth - kpiBoxGap) / 2;
-  const kpiBoxHeight = 70;
-  const kpiXLeft = marginLeft;
-  const kpiXRight = marginLeft + kpiBoxWidth + kpiBoxGap;
-  const kpiY = doc.y + 5;
+  const drawBigCompareTile = ({ x, y, w, h, bg, header, items, footerNote }) => {
+    doc.save();
+    doc.roundedRect(x, y, w, h, 16).fill(bg);
+    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(18)
+      .text(header, x + 26, y + 22, { width: w - 52 });
 
-  // Kachel 1: No-Show-Rate
-  doc
-    .save()
-    .roundedRect(kpiXLeft, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
-    .fill(colorBlack);
+    let cy = y + 64;
+    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(16);
+    for (const { label, value } of items) {
+      doc.font('Helvetica-Bold').text(label, x + 26, cy, { width: w - 52 });
+      doc.font('Helvetica').text(value, x + 26, cy + 18, { width: w - 52 });
+      cy += 54;
+      if (cy > y + h - 80) break;
+    }
 
-  doc
-    .fillColor('#ffffff')
-    .fontSize(10)
-    .text('No-Show-Rate (30 Tage)', kpiXLeft + 14, kpiY + 12, {
-      width: kpiBoxWidth - 28
-    });
-
-  doc
-    .fontSize(22)
-    .text(`${noShowRate} %`, kpiXLeft + 14, kpiY + 32, {
-      width: kpiBoxWidth - 28
-    })
-    .restore();
-
-  // Kachel 2: Umsatzverlust
-  doc
-    .save()
-    .roundedRect(kpiXRight, kpiY, kpiBoxWidth, kpiBoxHeight, 8)
-    .fill(colorBlack);
-
-  doc
-    .fillColor('#ffffff')
-    .fontSize(10)
-    .text('Umsatzverlust durch No-Shows (30 Tage)', kpiXRight + 14, kpiY + 12, {
-      width: kpiBoxWidth - 28
-    });
-
-  doc
-    .fontSize(22)
-    .text(
-      `${formatCurrency(currentLoss)} ${currency}`,
-      kpiXRight + 14,
-      kpiY + 32,
-      {
-        width: kpiBoxWidth - 28
-      }
-    )
-    .restore();
-
-  // Cursor unterhalb der Kacheln positionieren
-  doc.y = kpiY + kpiBoxHeight + 24;
-
-  // -----------------------------------------------------------------------
-  // 3. Potenzial-Vergleich "Heute" vs. "Mit aleno"
-  // -----------------------------------------------------------------------
-  if (showComparisonTiles) {
-    doc
-      .fontSize(14)
-      .fillColor(colorDark)
-      .text('Potenzial für dein Restaurant', { align: 'left' });
-
-    doc.moveDown(0.4);
-    doc
-      .fontSize(10)
-      .fillColor('#4b5563')
-      .text(
-        'So entwickelt sich dein Reservierungsumsatz, wenn du deine No-Show-Rate auf < 0,3 % senkst und zusätzlich 15 % mehr Umsatz pro reserviertem Gast erzielst.',
-        { align: 'left' }
-      );
-
-    doc.moveDown(0.8);
-
-    const compBoxGap = 16;
-    const compBoxWidth = (contentWidth - compBoxGap) / 2;
-    const compBoxHeight = 120;
-    const compXLeft = marginLeft;
-    const compXRight = marginLeft + compBoxWidth + compBoxGap;
-    const compY = doc.y;
-
-    // Linke Kachel: Heute (schwarz / dunkel)
-    doc
-      .save()
-      .roundedRect(compXLeft, compY, compBoxWidth, compBoxHeight, 10)
-      .fill(colorDark);
-
-    doc
-      .fillColor('#ffffff')
-      .fontSize(10)
-      .text('Heute (bei dir aktuell)', compXLeft + 16, compY + 14, {
-        width: compBoxWidth - 32
-      });
-
-    doc
-      .fontSize(11)
-      .text(
-        `No-Show-Quote: ${noShowRate} %`,
-        compXLeft + 16,
-        compY + 36,
-        { width: compBoxWidth - 32 }
-      );
-    doc
-      .text(
-        `Gesamtumsatz mit Reservierungen (30 Tage):`,
-        compXLeft + 16,
-        compY + 54,
-        { width: compBoxWidth - 32 }
-      );
-    doc
-      .fontSize(14)
-      .text(
-        `${formatCurrency(totalRevenue30)} ${currency}`,
-        compXLeft + 16,
-        compY + 72,
-        { width: compBoxWidth - 32 }
-      );
+    if (footerNote) {
+      doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(10)
+        .text(footerNote, x + 26, y + h - 48, { width: w - 52 });
+    }
 
     doc.restore();
+  };
 
-    // Rechte Kachel: Mit aleno (pink)
-    doc
-      .save()
-      .roundedRect(compXRight, compY, compBoxWidth, compBoxHeight, 10)
-      .fill(colorPink);
-
-    doc
-      .fillColor('#ffffff')
-      .fontSize(10)
-      .text('Mit aleno', compXRight + 16, compY + 14, {
-        width: compBoxWidth - 32
-      });
-
-    doc
-      .fontSize(11)
-      .text(
-        'No-Show-Quote: < 0,3 %',
-        compXRight + 16,
-        compY + 36,
-        { width: compBoxWidth - 32 }
-      );
-
-    doc
-      .text(
-        'Gesamtumsatz mit Reservierungen (30 Tage):',
-        compXRight + 16,
-        compY + 54,
-        { width: compBoxWidth - 32 }
-      );
-
-    doc
-      .fontSize(14)
-      .text(
-        `${formatCurrency(revenueWithAlenoPlus15)} ${currency}`,
-        compXRight + 16,
-        compY + 72,
-        { width: compBoxWidth - 32 }
-      );
-
-    const avoidable = formatCurrency(avoidableLoss);
-    const extra = formatCurrency(extraUpside15);
-
-    doc
-      .fontSize(9)
-      .text(
-        `davon ca. ${avoidable} ${currency} weniger No-Show-Verlust und ${extra} ${currency} zusätzliches Umsatzpotenzial`,
-        compXRight + 16,
-        compY + 94,
-        { width: compBoxWidth - 32 }
-      );
-
+  const drawCTAButton = ({ x, y, w, h, text, link }) => {
+    doc.save();
+    doc.roundedRect(x, y, w, h, 14).fill(COLOR_PINK);
+    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(14)
+      .text(text, x, y + 10, { width: w, align: 'center', link });
     doc.restore();
+  };
 
-    doc.y = compY + compBoxHeight + 24;
+  const drawCheckBullet = ({ x, y, text }) => {
+    // kleiner pinker Kreis + Häkchen-Effekt (vereinfacht) + Text
+    doc.save();
+    doc.fillColor(COLOR_PINK).circle(x + 6, y + 8, 6).fill();
+    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(10).text('✓', x + 3, y + 2);
+    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(13).text(text, x + 20, y, { width: contentW - 40 });
+    doc.restore();
+  };
+
+  const ensureNewPage = () => {
+    doc.addPage({ size: 'A4', layout: 'landscape', margin: 50 });
+  };
+
+  // ------------------ TITELSEITE ------------------
+  // Bildpfad (bitte anpassen, falls du es nicht in /public ablegst)
+  const IMAGE_PATH = path.join(process.cwd(), 'public', 'guests-restaurant.jpg');
+
+  // Hintergrund: Bild full-bleed (wenn vorhanden), sonst dunkles Feld
+  if (fs.existsSync(IMAGE_PATH)) {
+    doc.image(IMAGE_PATH, 0, 0, { width: pageW, height: pageH });
+    // dunkle Overlay-Fläche links (wie Whitepaper)
+    doc.save();
+    doc.fillOpacity(0.78).rect(0, 0, pageW * 0.52, pageH).fill(COLOR_DARK);
+    doc.restore();
   } else {
-    // Falls bereits aleno im Einsatz ist
-    doc.moveDown(0.8);
-    doc
-      .fontSize(11)
-      .fillColor('#4b5563')
-      .text(
-        'Du setzt bereits ein professionelles Reservierungs- und Gästemanagement-System ein. Mit aleno lassen sich No-Shows typischerweise auf rund 1,2 % senken – mit No-Show-Gebühr sogar auf etwa 0,4 %.'
-      );
-    doc.moveDown(1);
+    doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
   }
 
-  // -----------------------------------------------------------------------
-  // 4. Benchmark D / CH / AT
-  // -----------------------------------------------------------------------
-  doc
-    .fontSize(14)
-    .fillColor(colorDark)
-    .text('So schneiden andere Restaurants ab', {
-      align: 'left'
-    });
+  // Titel + Untertitel
+  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(44)
+    .text(`No-Show-Report`, marginL, 120, { width: pageW * 0.48 });
 
-  doc.moveDown(0.4);
-  doc
-    .fontSize(10)
-    .fillColor('#4b5563')
+  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(34)
+    .text(`für „${restaurantName}“`, marginL, 175, { width: pageW * 0.48 });
+
+  doc.moveDown(0.2);
+  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(18)
+    .text('Zahlen, Vergleiche und konkrete Maßnahmen', marginL, 240, { width: pageW * 0.48 });
+
+  // ------------------ SEITE 2: Aktuelle No-Show-Situation ------------------
+  ensureNewPage();
+
+  doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
+    .text('Deine aktuelle No-Show-Situation', marginL, 50);
+
+  doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14)
     .text(
-      'In vielen Restaurants ohne modernes Reservierungssystem liegen No-Show-Raten im Bereich von 10–20 %, je nach Lage und Zielgruppe.',
-      { align: 'left' }
+      'Basierend auf deinen Angaben haben wir deine No-Show-Quote und den Umsatzverlust durch nicht erschienene Gäste für die letzten 30 Tage berechnet.',
+      marginL,
+      92,
+      { width: contentW }
     );
 
-  doc.moveDown(0.3);
-  doc
-    .fontSize(10)
-    .fillColor(colorText)
-    .text('Typische Spannweiten der No-Show-Rate ohne Reservierungssystem:');
-  doc.moveDown(0.2);
-  doc.fontSize(10).fillColor('#4b5563');
-  doc.text('• Deutschland: ca. 15–18 %');
-  doc.text('• Schweiz: ca. 12–15 %');
-  doc.text('• Österreich: ca. 14–17 %');
+  // KPI Tiles (groß)
+  const tileGap = 26;
+  const tileW = (contentW - tileGap) / 2;
+  const tileH = 150;
+  const tileY = 140;
 
-  doc.moveDown(0.8);
+  drawKpiTile({
+    x: marginL,
+    y: tileY,
+    w: tileW,
+    h: tileH,
+    title: 'No-Show-Rate (30 Tage)',
+    value: `${noShowRate.toFixed(1)}%`,
+    bg: COLOR_BLACK
+  });
 
-  // -----------------------------------------------------------------------
-  // 5. Konkrete Tipps zur Vermeidung von No-Shows
-  // -----------------------------------------------------------------------
-  doc
-    .fontSize(14)
-    .fillColor(colorDark)
-    .text('Konkrete Tipps zur Vermeidung von No-Shows', {
-      align: 'left'
+  drawKpiTile({
+    x: marginL + tileW + tileGap,
+    y: tileY,
+    w: tileW,
+    h: tileH,
+    title: 'Umsatzverlust durch No-Shows (30 Tage)',
+    value: `${formatCurrency(loss30 || netLoss30)} ${currency}`,
+    bg: COLOR_BLACK
+  });
+
+  // Benchmark section
+  const benchTitleY = tileY + tileH + 34;
+  doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(18)
+    .text('Vergleichszahlen von Restaurants aus dem DACH-Raum', marginL, benchTitleY);
+
+  // personalisierter Satz über/unter Durchschnitt (simple Einordnung)
+  const avgDachMid = 15; // grobe Mitte der Spannweiten
+  const direction = noShowRate >= avgDachMid ? 'über' : 'unter';
+  doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(13)
+    .text(`Deine No-Show-Rate liegt damit ${direction} dem Branchendurchschnitt.`, marginL, benchTitleY + 24);
+
+  const benchY = benchTitleY + 62;
+  const benchGap = 18;
+  const benchW = (contentW - benchGap * 2) / 3;
+  const benchH = 120;
+
+  drawOutlineTile({
+    x: marginL,
+    y: benchY,
+    w: benchW,
+    h: benchH,
+    title: 'Deutschland',
+    lines: ['Ø No-Show-Rate', 'ca. 15–18 %']
+  });
+
+  drawOutlineTile({
+    x: marginL + benchW + benchGap,
+    y: benchY,
+    w: benchW,
+    h: benchH,
+    title: 'Österreich',
+    lines: ['Ø No-Show-Rate', 'ca. 14–17 %']
+  });
+
+  drawOutlineTile({
+    x: marginL + (benchW + benchGap) * 2,
+    y: benchY,
+    w: benchW,
+    h: benchH,
+    title: 'Schweiz',
+    lines: ['Ø No-Show-Rate', 'ca. 12–15 %']
+  });
+
+  doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(10)
+    .text('Quelle: Diese Zahlen sind aus aggregierten Branchenreports und Betreiberdaten.', marginL, benchY + benchH + 14);
+
+  // ------------------ SEITE 3: Dein Potenzial (nur wenn anderes System im Einsatz) ------------------
+  if (hasOtherTool) {
+    ensureNewPage();
+
+    doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
+      .text('Dein Potenzial', marginL, 50);
+
+    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14)
+      .text(
+        'So könnte sich dein Reservierungsumsatz entwickeln, wenn du deine No-Show-Rate auf < 0,3 % senkst und zusätzlich 15 % mehr Umsatz pro reserviertem Gast erzielst.',
+        marginL,
+        92,
+        { width: contentW }
+      );
+
+    const boxGap = 26;
+    const boxW = (contentW - boxGap) / 2;
+    const boxH = 360;
+    const boxY = 140;
+
+    // Linke Kachel: bestehende Software
+    drawBigCompareTile({
+      x: marginL,
+      y: boxY,
+      w: boxW,
+      h: boxH,
+      bg: COLOR_BLACK,
+      header: 'Mit bestehender Software:',
+      items: [
+        { label: 'No-Show-Rate', value: `${noShowRate.toFixed(1)} %` },
+        { label: 'Gesamt-Umsatz über Reservierungen (30 Tage)', value: `${formatCurrency(revenueActual30)} ${currency}` },
+        { label: 'Zusätzliches Umsatzpotenzial', value: `${formatCurrency(avoidableLossGross)} ${currency}` },
+        { label: 'Zeitersparnis', value: '0 Stunden' }
+      ]
     });
 
-  doc.moveDown(0.3);
-  doc.fontSize(10).fillColor('#4b5563');
-  doc.text(
-    '• Schicke zwei Tage vor der Reservierung eine automatisierte Erinnerung mit der Möglichkeit, online zu stornieren (z. B. bis spätestens 24 Stunden vorher). So kannst du frei werdende Tische noch kurzfristig neu vergeben.'
-  );
-  doc.moveDown(0.2);
-  doc.text(
-    '• Setze auf provisorische Reservierungen: Erst nach deiner Bestätigung ist der Tisch wirklich fix. So siehst du in deinem CRM die bisherigen Pro-Kopf-Umsätze und kannst bei hoher Nachfrage Stammgäste oder umsatzstarke Gäste bevorzugen.'
-  );
-  doc.moveDown(0.2);
-  doc.text(
-    '• Nutze Ticketing für Events und Specials (z. B. Chef’s Table): Gäste wählen im Reservierungsprozess direkt ihr Menü und bezahlen im Voraus. Damit sicherst du dir die Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste.'
-  );
-
-  doc.moveDown(0.8);
-
-  // -----------------------------------------------------------------------
-  // 6. aleno-Block mit CTA – visuell an Whitepaper angelehnt
-  // -----------------------------------------------------------------------
-  const promoBoxHeight = 90;
-  const promoY = Math.min(doc.y, pageHeight - promoBoxHeight - 60); // kleine Sicherheit
-
-  doc
-    .save()
-    .roundedRect(
-      marginLeft,
-      promoY,
-      contentWidth,
-      promoBoxHeight,
-      10
-    )
-    .fill(colorDark);
-
-  const promoInnerX = marginLeft + 18;
-  const promoInnerWidth = contentWidth - 36;
-
-  doc
-    .fillColor('#ffffff')
-    .fontSize(13)
-    .text(
-      'aleno – der digitale Assistent für Restaurants & Hotels',
-      promoInnerX,
-      promoY + 14,
-      {
-        width: promoInnerWidth
-      }
-    );
-
-  doc
-    .fontSize(9.5)
-    .text(
-      'aleno vereint Reservierungs-, Tisch- und Gästemanagement in einer Plattform. Automatisierte Online-Reservierungen, intelligente Tischplanung und ein zentrales Gästedatenmanagement sorgen für höhere Auslastung und mehr Umsatz – und geben deinem Team wieder Zeit für das Wichtigste: die Gäste.',
-      promoInnerX,
-      promoY + 34,
-      { width: promoInnerWidth }
-    );
-
-  // CTA-Button anstelle eines QR-Codes
-  const btnWidth = 220;
-  const btnHeight = 18;
-  const btnX = promoInnerX;
-  const btnY = promoY + promoBoxHeight - btnHeight - 10;
-
-  doc
-    .roundedRect(btnX, btnY, btnWidth, btnHeight, 9)
-    .fill(colorPink);
-
-  doc
-    .fillColor('#ffffff')
-    .fontSize(9.5)
-    .text('Jetzt aleno kostenlos kennenlernen', btnX, btnY + 4, {
-      width: btnWidth,
-      align: 'center',
-      link: 'https://www.aleno.me/de/demo'
+    // Rechte Kachel: aleno
+    drawBigCompareTile({
+      x: marginL + boxW + boxGap,
+      y: boxY,
+      w: boxW,
+      h: boxH,
+      bg: COLOR_PINK,
+      header: 'Mit aleno:',
+      items: [
+        { label: 'No-Show-Rate', value: '< 0,3 %' },
+        { label: 'Gesamt-Umsatz über Reservierungen (30 Tage)', value: `${formatCurrency(revenueWithAlenoBase)} ${currency}` },
+        { label: 'Zusätzliches Umsatzpotenzial*', value: `${formatCurrency(extraUpside15)} ${currency}` },
+        { label: 'Zeitersparnis', value: '⌀ 14h pro Woche' }
+      ],
+      footerNote:
+        '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
     });
 
-  doc.restore();
+    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(10)
+      .text(
+        'Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.',
+        marginL,
+        pageH - 70,
+        { width: contentW }
+      );
+  }
 
-  // WICHTIG: Stream beenden und zurückgeben
+  // ------------------ SEITE 4: 4 Maßnahmen gegen No-Shows ------------------
+  ensureNewPage();
+
+  doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
+    .text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
+
+  const tipsX = marginL;
+  let tipsY = 105;
+
+  const tipTitle = (n, t) => {
+    doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(18).text(`${n}. ${t}`, tipsX, tipsY);
+    tipsY += 26;
+  };
+
+  const tipBody = (txt) => {
+    doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(14)
+      .text(txt, tipsX, tipsY, { width: contentW });
+    tipsY += 54;
+  };
+
+  tipTitle(1, 'Autom. Erinnerung');
+  tipBody(
+    'Schicke 2 Tage vor dem Termin einen Hinweis auf den bevorstehenden Besuch mit der Möglichkeit, online zu stornieren (z. B. bis spätestens 24h vorher). So hast du die Möglichkeit, die Tische rechtzeitig neu zu vergeben.'
+  );
+
+  tipTitle(2, 'Provisorische Reservierungen');
+  tipBody(
+    'Kommuniziere bei der Reservierung, dass die Reservierung erst nach Bestätigung durch das Restaurant gültig ist. So kannst du im CRM prüfen, ob der Gast früher No-Shows generiert hat und ob es ein umsatzstarker Gast ist.'
+  );
+
+  tipTitle(3, 'Ticketing für Events und Specials');
+  tipBody(
+    'Lass Gäste nicht nur reservieren, sondern direkt buchen – z. B. Chef’s Table: Gäste wählen im Reservierungsprozess ihr Menü und bezahlen im Voraus. Damit sicherst du dir Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste.'
+  );
+
+  tipTitle(4, 'Warteliste');
+  tipBody(
+    'Wenn dein Restaurant gut gebucht ist, setze eine Warteliste ein, in die sich Gäste selbst eintragen können. Wird kurzfristig ein Tisch frei, kannst du dem nächsten passenden Gast den Tisch anbieten.'
+  );
+
+  drawCTAButton({
+    x: marginL,
+    y: pageH - 110,
+    w: 320,
+    h: 46,
+    text: 'Mehr Tipps zur No-Show-Vermeidung',
+    link: 'https://www.aleno.me/de/blog/no-show-restaurant'
+  });
+
+  // ------------------ SEITE 5: Whitepaper-Stil (Seite 30) + Demo-Button ------------------
+  ensureNewPage();
+
+  // Dunkler Hintergrund (wie Whitepaper)
+  doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
+
+  // Titel
+  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(40)
+    .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
+
+  // Zwei Spalten Intro-Text
+  const colGap = 30;
+  const colW = (contentW - colGap) / 2;
+  const colY = 165;
+
+  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(14)
+    .text(
+      'Der Digitale Assistent aleno ist eine smarte All-in-One-Lösung für Gästekommunikation, Tischreservierungen und Betriebsoptimierung in der Gastronomie.',
+      marginL,
+      colY,
+      { width: colW }
+    );
+
+  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(14)
+    .text(
+      'Die Software unterstützt dabei, Abläufe zu automatisisieren, Auslastung zu steigern und Gäste durch personalisierte Erlebnisse langfristig zu binden.',
+      marginL + colW + colGap,
+      colY,
+      { width: colW }
+    );
+
+  // Drei pinke KPI-Kacheln
+  const pinkY = 265;
+  const pinkGap = 18;
+  const pinkW = (contentW - pinkGap * 2) / 3;
+  const pinkH = 90;
+
+  const pinkBox = (x, title, body) => {
+    doc.save();
+    doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
+    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(18)
+      .text(title, x + 18, pinkY + 16, { width: pinkW - 36 });
+    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(12)
+      .text(body, x + 18, pinkY + 42, { width: pinkW - 36 });
+    doc.restore();
+  };
+
+  pinkBox(marginL, '15% mehr Gäste', 'Die L’Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern.');
+  pinkBox(marginL + pinkW + pinkGap, '< 0,5% No-Shows', 'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.');
+  pinkBox(marginL + (pinkW + pinkGap) * 2, '5,2x ROI', 'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.');
+
+  // Vorteile
+  const vY = 385;
+  doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(20)
+    .text('Deine Vorteile mit aleno:', marginL, vY);
+
+  let by = vY + 34;
+  const benefits = [
+    'Spare mehrere Stunden Arbeit pro Woche durch Automatisierung',
+    'Nutze 360-Grad-Gästeprofile für gezieltes und erfolgreiches Upselling',
+    'Optimiere die Auslastung durch KI-gestützte Tischzuweisung',
+    'Reduziere No-Shows und erhalte verbindliche Buchungen',
+    'Behalte volle Kontrolle über deine Daten und deine Marke'
+  ];
+  for (const b of benefits) {
+    drawCheckBullet({ x: marginL, y: by, text: b });
+    by += 26;
+  }
+
+  // Masterplan
+  const mY = by + 22;
+  doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(20)
+    .text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
+
+  let my = mY + 36;
+  const master = [
+    { head: 'Buche eine kostenlose live Demo', text: 'Lerne die Möglichkeiten von aleno kennen.' },
+    { head: 'Erhalte eine individuelle Beratung', text: 'Entdecke, welche Optimierungspotenziale in deinem Restaurant oder Hotel aktiviert werden können.' },
+    { head: 'Starte direkt durch', text: 'Das aleno-Team richtet das System für dich ein.' }
+  ];
+
+  for (const item of master) {
+    doc.fillColor(COLOR_PINK).font('Helvetica-Bold').fontSize(14).text('•', marginL, my);
+    doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(14)
+      .text(`${item.head}:`, marginL + 16, my, { continued: true });
+    doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(14)
+      .text(` ${item.text}`, { width: contentW - 40 });
+    my += 26;
+  }
+
+  // CTA Button statt QR
+  drawCTAButton({
+    x: marginL,
+    y: pageH - 95,
+    w: 320,
+    h: 46,
+    text: 'Kostenlose Demo buchen',
+    link: 'https://www.aleno.me/de/demo'
+  });
+
+  // Ende
   doc.end();
   return doc;
 }
