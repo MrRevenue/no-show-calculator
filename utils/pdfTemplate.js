@@ -16,6 +16,7 @@ export function generatePdf(formData) {
   const FONT_SEMIBOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-SemiBold.ttf');
   const FONT_BOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Bold.ttf');
 
+  // Wichtig: wenn eine Font fehlt, wirft registerFont/openSync einen Error (gut so: dann sieht man es im Log)
   doc.registerFont('Poppins-Light', FONT_LIGHT);
   doc.registerFont('Poppins', FONT_REGULAR);
   doc.registerFont('Poppins-SemiBold', FONT_SEMIBOLD);
@@ -46,7 +47,6 @@ export function generatePdf(formData) {
   // ------------------ Farben (wie gewünscht) ------------------
   const COLOR_DARK = '#282731';
   const COLOR_PINK = '#ff2e92';
-
   const COLOR_BLACK = '#000000';
   const COLOR_WHITE = '#ffffff';
 
@@ -54,16 +54,16 @@ export function generatePdf(formData) {
   const COLOR_SUB = '#d1d5db';
 
   const currency =
-    formData.country === 'Schweiz' ||
-    formData.country === 'Switzerland' ||
-    formData.currency === 'CHF'
+    formData?.country === 'Schweiz' ||
+    formData?.country === 'Switzerland' ||
+    formData?.currency === 'CHF'
       ? 'CHF'
       : '€';
 
   const formatCurrency = (val) => Math.round(Number(val || 0)).toLocaleString('de-DE');
 
   // ------------------ Daten aus Frontend-Berechnung ------------------
-  const calculated = formData.calculated || {};
+  const calculated = formData?.calculated || {};
 
   const noShowRateNum = Number(
     typeof calculated.noShowRate === 'number' ? calculated.noShowRate : calculated.noShowRate || 0
@@ -75,19 +75,20 @@ export function generatePdf(formData) {
   );
 
   const totalRevenue30 = Number(
-    typeof calculated.totalRevenue30 === 'number' ? calculated.totalRevenue30 : calculated.totalRevenue30 || 0
-  );
-
-  const totalGuests30 = Number(
-    typeof calculated.totalGuests30 === 'number' ? calculated.totalGuests30 : calculated.totalGuests30 || 0
+    typeof calculated.totalRevenue30 === 'number'
+      ? calculated.totalRevenue30
+      : calculated.totalRevenue30 || 0
   );
 
   const noShowGuests30 = Number(
-    typeof calculated.noShowGuests30 === 'number' ? calculated.noShowGuests30 : calculated.noShowGuests30 || 0
+    typeof calculated.noShowGuests30 === 'number'
+      ? calculated.noShowGuests30
+      : calculated.noShowGuests30 || 0
   );
 
-  const avgSpend = Number(formData.averageSpend || 0);
-  const noShowFeePerGuest = formData.feeForNoShow === 'Ja' ? Number(formData.noShowFee || 0) : 0;
+  const avgSpend = Number(formData?.averageSpend || 0);
+  const noShowFeePerGuest =
+    formData?.feeForNoShow === 'Ja' ? Number(formData?.noShowFee || 0) : 0;
 
   // Bruttopotenzial/Verlust-Logik (für Umsatzdarstellungen)
   const grossLoss30 = Math.max(noShowGuests30 * avgSpend, 0);
@@ -100,10 +101,9 @@ export function generatePdf(formData) {
   // Zielwerte „mit aleno“
   const TARGET_NOSHOW_RATE = 0.003; // 0.3 %
   const targetGrossLoss = Math.max(totalRevenue30 * TARGET_NOSHOW_RATE, 0);
-  const avoidableLossGross = Math.max(grossLoss30 - targetGrossLoss, 0); // vermeidbarer Verlust (brutto)
+  const avoidableLossGross = Math.max(grossLoss30 - targetGrossLoss, 0);
   const revenueWithAlenoBase = Math.max(revenueActual30 + avoidableLossGross, 0);
   const extraUpside15 = Math.max(revenueWithAlenoBase * 0.15, 0);
-  const revenueWithAlenoPlus15 = revenueWithAlenoBase + extraUpside15;
 
   const restaurantName =
     get('restaurantName') !== '-' && safeStr(get('restaurantName')).trim()
@@ -117,12 +117,12 @@ export function generatePdf(formData) {
   const usesAleno = hasOnline === 'Ja' && reservationTool.includes('aleno');
   const hasOtherTool = hasOnline === 'Ja' && reservationToolRaw && !usesAleno;
 
-  // ------------------ Cover Assets (/public) ------------------
+  // ------------------ Assets (/public) ------------------
   const COVER_IMAGE = path.join(process.cwd(), 'public', 'guests-restaurant.jpg');
   const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-logo.png');
 
   // =============================================================
-  // SEITE 1: TITELSEITE (wie Vorlage) – Full Bleed
+  // SEITE 1: TITELSEITE (Full Bleed)
   // =============================================================
   const coverW = doc.page.width;
   const coverH = doc.page.height;
@@ -140,7 +140,7 @@ export function generatePdf(formData) {
     .fillColor(COLOR_WHITE)
     .font('Poppins-Light')
     .fontSize(56)
-    .text(`No-Show-Report\nfür das Restaurant\n"${restaurantName}"`, 55, 270, {
+    .text(`No-Show-Report\nfür das Restaurant\n„${restaurantName}“`, 55, 270, {
       width: coverW * 0.55,
       lineGap: 6
     });
@@ -154,25 +154,28 @@ export function generatePdf(formData) {
 
   // Bild rechts mit 2 schrägen Kanten (links + unten)
   if (fs.existsSync(COVER_IMAGE)) {
+    // Regler für die Schräge (wie dein aktuelles Template)
     const xTopLeft = coverW * 0.62;
     const yTopLeft = 90;
     const xBottomLeft = coverW * 0.72;
     const yBottomLeft = coverH * 0.78;
 
     doc.save();
+
     doc
       .polygon(
         xTopLeft,
-        yTopLeft,
+        yTopLeft,     // oben links (linke Schräge)
         coverW,
-        0,
+        0,            // oben rechts
         coverW,
-        coverH,
+        coverH,       // unten rechts
         xBottomLeft,
-        yBottomLeft
+        yBottomLeft   // unten links (untere Schräge)
       )
       .clip();
 
+    // etwas größer platzieren, um keine Kanten zu riskieren
     doc.image(COVER_IMAGE, coverW * 0.58, 0, {
       width: coverW * 0.45,
       height: coverH
@@ -301,7 +304,11 @@ export function generatePdf(formData) {
   // =============================================================
   // SEITE 2: Aktuelle No-Show-Situation
   // =============================================================
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28).text('Deine aktuelle No-Show-Situation', marginL, 50);
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(28)
+    .text('Deine aktuelle No-Show-Situation', marginL, 50);
 
   doc
     .fillColor(COLOR_GRAY)
@@ -314,6 +321,7 @@ export function generatePdf(formData) {
       { width: contentW }
     );
 
+  // KPI Tiles (groß)
   const tileGap = 26;
   const tileW = (contentW - tileGap) / 2;
   const tileH = 150;
@@ -339,7 +347,9 @@ export function generatePdf(formData) {
     bg: COLOR_BLACK
   });
 
+  // Benchmark section
   const benchTitleY = tileY + tileH + 34;
+
   doc
     .fillColor(COLOR_BLACK)
     .font('Poppins-Bold')
@@ -348,6 +358,7 @@ export function generatePdf(formData) {
 
   const avgDachMid = 15;
   const direction = noShowRate >= avgDachMid ? 'über' : 'unter';
+
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
@@ -365,7 +376,7 @@ export function generatePdf(formData) {
     w: benchW,
     h: benchH,
     title: 'Deutschland',
-    lines: ['Ø No-Show-Rate', 'ca. 15-18 %']
+    lines: ['Ø No-Show-Rate', 'ca. 15–18 %']
   });
 
   drawOutlineTile({
@@ -374,7 +385,7 @@ export function generatePdf(formData) {
     w: benchW,
     h: benchH,
     title: 'Österreich',
-    lines: ['Ø No-Show-Rate', 'ca. 14-17 %']
+    lines: ['Ø No-Show-Rate', 'ca. 14–17 %']
   });
 
   drawOutlineTile({
@@ -383,7 +394,7 @@ export function generatePdf(formData) {
     w: benchW,
     h: benchH,
     title: 'Schweiz',
-    lines: ['Ø No-Show-Rate', 'ca. 12-15 %']
+    lines: ['Ø No-Show-Rate', 'ca. 12–15 %']
   });
 
   doc
@@ -489,7 +500,7 @@ export function generatePdf(formData) {
 
   tipTitle(3, 'Ticketing für Events und Specials');
   tipBody(
-    "Lass Gäste nicht nur reservieren, sondern direkt buchen - z. B. Chef's Table: Gäste wählen im Reservierungsprozess direkt ihr Menü und bezahlen im Voraus. Damit sicherst du dir Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste."
+    "Lass Gäste nicht nur reservieren, sondern direkt buchen – z. B. Chef’s Table: Gäste wählen im Reservierungsprozess direkt ihr Menü und bezahlen im Voraus. Damit sicherst du dir Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste."
   );
 
   tipTitle(4, 'Warteliste');
@@ -507,18 +518,21 @@ export function generatePdf(formData) {
   });
 
   // =============================================================
-  // SEITE 5: Whitepaper-Stil (Seite 30) + Demo-Button
+  // SEITE 5: Whitepaper-Stil + Demo-Button
   // =============================================================
   ensureNewPage();
 
+  // Dunkler Hintergrund
   doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
 
+  // Titel
   doc
     .fillColor(COLOR_WHITE)
     .font('Poppins-Light')
     .fontSize(40)
     .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
 
+  // Zwei Spalten Intro-Text
   const colGap = 30;
   const colW = (contentW - colGap) / 2;
   const colY = 165;
@@ -545,6 +559,7 @@ export function generatePdf(formData) {
       { width: colW }
     );
 
+  // Drei pinke KPI-Kacheln
   const pinkY = 265;
   const pinkGap = 18;
   const pinkW = (contentW - pinkGap * 2) / 3;
@@ -554,21 +569,26 @@ export function generatePdf(formData) {
     doc.save();
     doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
 
-    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(18).text(safeStr(title), x + 18, pinkY + 16, {
-      width: pinkW - 36
-    });
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Bold')
+      .fontSize(18)
+      .text(safeStr(title), x + 18, pinkY + 16, { width: pinkW - 36 });
 
-    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(12).text(safeStr(body), x + 18, pinkY + 42, {
-      width: pinkW - 36
-    });
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Light')
+      .fontSize(12)
+      .text(safeStr(body), x + 18, pinkY + 42, { width: pinkW - 36 });
 
     doc.restore();
   };
 
-  pinkBox(marginL, '15% mehr Gäste', "Die L'Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern.");
+  pinkBox(marginL, '15% mehr Gäste', "Die L’Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern.");
   pinkBox(marginL + pinkW + pinkGap, '< 0,5% No-Shows', 'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.');
   pinkBox(marginL + (pinkW + pinkGap) * 2, '5,2x ROI', 'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.');
 
+  // Vorteile
   const vY = 385;
   doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Deine Vorteile mit aleno:', marginL, vY);
 
@@ -586,6 +606,7 @@ export function generatePdf(formData) {
     by += 26;
   }
 
+  // Masterplan
   const mY = by + 22;
   doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
 
@@ -617,6 +638,7 @@ export function generatePdf(formData) {
     my += 26;
   }
 
+  // CTA Button
   drawCTAButton({
     x: marginL,
     y: pageH - 95,
@@ -626,6 +648,7 @@ export function generatePdf(formData) {
     link: 'https://www.aleno.me/de/demo'
   });
 
+  // Ende: IMPORTANT – hier endet das Dokument, aber es wird NICHT gepiped (das macht send-report.js)
   doc.end();
   return doc;
 }
