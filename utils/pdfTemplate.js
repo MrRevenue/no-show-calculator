@@ -21,10 +21,27 @@ export function generatePdf(formData) {
   doc.registerFont('Poppins-SemiBold', FONT_SEMIBOLD);
   doc.registerFont('Poppins-Bold', FONT_BOLD);
 
-  // 👉 Standard-Font global setzen (auch Titel)
+  // 👉 Standard-Font global setzen (auch für Titel)
   doc.font('Poppins-Light');
 
-  const get = (key) => formData?.[key] ?? '-';
+  // ------------------ Safety Helpers ------------------
+  const safeStr = (v, fallback = '') => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    try {
+      return String(v);
+    } catch {
+      return fallback;
+    }
+  };
+
+  const safeArr = (v) => (Array.isArray(v) ? v : []);
+
+  const get = (key) => {
+    const v = formData?.[key];
+    return v === null || v === undefined || v === '' ? '-' : v;
+  };
 
   // ------------------ Farben (wie gewünscht) ------------------
   const COLOR_DARK = '#282731';
@@ -43,8 +60,7 @@ export function generatePdf(formData) {
       ? 'CHF'
       : '€';
 
-  const formatCurrency = (val) =>
-    Math.round(Number(val || 0)).toLocaleString('de-DE');
+  const formatCurrency = (val) => Math.round(Number(val || 0)).toLocaleString('de-DE');
 
   // ------------------ Daten aus Frontend-Berechnung ------------------
   const calculated = formData.calculated || {};
@@ -71,8 +87,7 @@ export function generatePdf(formData) {
   );
 
   const avgSpend = Number(formData.averageSpend || 0);
-  const noShowFeePerGuest =
-    formData.feeForNoShow === 'Ja' ? Number(formData.noShowFee || 0) : 0;
+  const noShowFeePerGuest = formData.feeForNoShow === 'Ja' ? Number(formData.noShowFee || 0) : 0;
 
   // Bruttopotenzial/Verlust-Logik (für Umsatzdarstellungen)
   const grossLoss30 = Math.max(noShowGuests30 * avgSpend, 0);
@@ -91,13 +106,13 @@ export function generatePdf(formData) {
   const revenueWithAlenoPlus15 = revenueWithAlenoBase + extraUpside15;
 
   const restaurantName =
-    get('restaurantName') !== '-' && String(get('restaurantName')).trim()
-      ? String(get('restaurantName')).trim()
+    get('restaurantName') !== '-' && safeStr(get('restaurantName')).trim()
+      ? safeStr(get('restaurantName')).trim()
       : 'dein Restaurant';
 
   // ------------------ Bedingungen für Seite 3 ------------------
-  const hasOnline = String(get('hasOnlineReservation') || '');
-  const reservationToolRaw = String(get('reservationTool') || '');
+  const hasOnline = safeStr(get('hasOnlineReservation'), '');
+  const reservationToolRaw = safeStr(get('reservationTool'), '');
   const reservationTool = reservationToolRaw.toLowerCase().replace(/\s+/g, '');
   const usesAleno = hasOnline === 'Ja' && reservationTool.includes('aleno');
   const hasOtherTool = hasOnline === 'Ja' && reservationToolRaw && !usesAleno;
@@ -125,12 +140,10 @@ export function generatePdf(formData) {
     .fillColor(COLOR_WHITE)
     .font('Poppins-Light')
     .fontSize(56)
-    .text(
-      `No-Show-Report\nfür das Restaurant\n"${restaurantName}"`,
-      55,
-      270,
-      { width: coverW * 0.55, lineGap: 6 }
-    );
+    .text(`No-Show-Report\nfür das Restaurant\n"${restaurantName}"`, 55, 270, {
+      width: coverW * 0.55,
+      lineGap: 6
+    });
 
   // Untertitel
   doc
@@ -141,24 +154,25 @@ export function generatePdf(formData) {
 
   // Bild rechts mit 2 schrägen Kanten (links + unten)
   if (fs.existsSync(COVER_IMAGE)) {
-    // Regler für die Schräge:
     const xTopLeft = coverW * 0.62;
     const yTopLeft = 90;
     const xBottomLeft = coverW * 0.72;
     const yBottomLeft = coverH * 0.78;
 
     doc.save();
-
     doc
       .polygon(
-        xTopLeft, yTopLeft,      // oben links (schräge linke Kante)
-        coverW, 0,               // oben rechts
-        coverW, coverH,          // unten rechts
-        xBottomLeft, yBottomLeft // unten links (schräge Unterkante)
+        xTopLeft,
+        yTopLeft,
+        coverW,
+        0,
+        coverW,
+        coverH,
+        xBottomLeft,
+        yBottomLeft
       )
       .clip();
 
-    // etwas größer platzieren, um keine Kanten zu riskieren
     doc.image(COVER_IMAGE, coverW * 0.58, 0, {
       width: coverW * 0.45,
       height: coverH
@@ -168,11 +182,10 @@ export function generatePdf(formData) {
   }
 
   // =============================================================
-  // Ab Seite 2: Content Seiten mit Margin 50 (Rest wie gehabt)
+  // Ab Seite 2: Content Seiten mit Margin 50
   // =============================================================
   doc.addPage({ size: 'A4', layout: 'landscape', margin: 50 });
 
-  // Layout-Konstanten neu nach Page-Add (Margins ändern sich!)
   const pageW = doc.page.width;
   const pageH = doc.page.height;
   const marginL = doc.page.margins.left;
@@ -184,11 +197,17 @@ export function generatePdf(formData) {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).fill(bg);
 
-    doc.fillColor(fg).font('Poppins-Light').fontSize(16)
-      .text(title, x + 24, y + 22, { width: w - 48, align: 'center' });
+    doc
+      .fillColor(fg)
+      .font('Poppins-Light')
+      .fontSize(16)
+      .text(safeStr(title), x + 24, y + 22, { width: w - 48, align: 'center' });
 
-    doc.fillColor(fg).font('Poppins-Bold').fontSize(40)
-      .text(value, x + 24, y + 58, { width: w - 48, align: 'center' });
+    doc
+      .fillColor(fg)
+      .font('Poppins-Bold')
+      .fontSize(40)
+      .text(safeStr(value), x + 24, y + 58, { width: w - 48, align: 'center' });
 
     doc.restore();
   };
@@ -197,14 +216,17 @@ export function generatePdf(formData) {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).lineWidth(2).stroke(COLOR_BLACK);
 
-    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18)
-      .text(title, x + 22, y + 20, { width: w - 44, align: 'left' });
+    doc
+      .fillColor(COLOR_BLACK)
+      .font('Poppins-Bold')
+      .fontSize(18)
+      .text(safeStr(title), x + 22, y + 20, { width: w - 44, align: 'left' });
 
     doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14);
 
     let cy = y + 58;
-    for (const ln of lines) {
-      doc.text(ln, x + 22, cy, { width: w - 44 });
+    for (const ln of safeArr(lines)) {
+      doc.text(safeStr(ln), x + 22, cy, { width: w - 44 });
       cy += 22;
     }
     doc.restore();
@@ -214,22 +236,34 @@ export function generatePdf(formData) {
     doc.save();
     doc.roundedRect(x, y, w, h, 16).fill(bg);
 
-    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(18)
-      .text(header, x + 26, y + 22, { width: w - 52 });
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Bold')
+      .fontSize(18)
+      .text(safeStr(header), x + 26, y + 22, { width: w - 52 });
 
     let cy = y + 64;
-    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(16);
 
-    for (const { label, value } of items) {
-      doc.font('Poppins-SemiBold').text(label, x + 26, cy, { width: w - 52 });
-      doc.font('Poppins-Light').text(value, x + 26, cy + 18, { width: w - 52 });
+    for (const it of safeArr(items)) {
+      const label = safeStr(it?.label);
+      const value = safeStr(it?.value);
+
+      doc.fillColor(COLOR_WHITE).font('Poppins-SemiBold').fontSize(16);
+      doc.text(label, x + 26, cy, { width: w - 52 });
+
+      doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(16);
+      doc.text(value, x + 26, cy + 18, { width: w - 52 });
+
       cy += 54;
       if (cy > y + h - 80) break;
     }
 
     if (footerNote) {
-      doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(10)
-        .text(footerNote, x + 26, y + h - 48, { width: w - 52 });
+      doc
+        .fillColor(COLOR_WHITE)
+        .font('Poppins-Light')
+        .fontSize(10)
+        .text(safeStr(footerNote), x + 26, y + h - 48, { width: w - 52 });
     }
 
     doc.restore();
@@ -239,8 +273,11 @@ export function generatePdf(formData) {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).fill(COLOR_PINK);
 
-    doc.fillColor(COLOR_WHITE).font('Poppins-SemiBold').fontSize(14)
-      .text(text, x, y + 10, { width: w, align: 'center', link });
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-SemiBold')
+      .fontSize(14)
+      .text(safeStr(text), x, y + 10, { width: w, align: 'center', link });
 
     doc.restore();
   };
@@ -249,7 +286,11 @@ export function generatePdf(formData) {
     doc.save();
     doc.fillColor(COLOR_PINK).circle(x + 6, y + 8, 6).fill();
     doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(10).text('✓', x + 3, y + 2);
-    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(13).text(text, x + 20, y, { width: contentW - 40 });
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Light')
+      .fontSize(13)
+      .text(safeStr(text), x + 20, y, { width: contentW - 40 });
     doc.restore();
   };
 
@@ -260,10 +301,12 @@ export function generatePdf(formData) {
   // =============================================================
   // SEITE 2: Aktuelle No-Show-Situation
   // =============================================================
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28)
-    .text('Deine aktuelle No-Show-Situation', marginL, 50);
+  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28).text('Deine aktuelle No-Show-Situation', marginL, 50);
 
-  doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14)
+  doc
+    .fillColor(COLOR_GRAY)
+    .font('Poppins-Light')
+    .fontSize(14)
     .text(
       'Basierend auf deinen Angaben haben wir deine No-Show-Quote und den Umsatzverlust durch nicht erschienene Gäste für die letzten 30 Tage berechnet.',
       marginL,
@@ -271,7 +314,6 @@ export function generatePdf(formData) {
       { width: contentW }
     );
 
-  // KPI Tiles (groß)
   const tileGap = 26;
   const tileW = (contentW - tileGap) / 2;
   const tileH = 150;
@@ -297,15 +339,19 @@ export function generatePdf(formData) {
     bg: COLOR_BLACK
   });
 
-  // Benchmark section
   const benchTitleY = tileY + tileH + 34;
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18)
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
     .text('Vergleichszahlen von Restaurants aus dem DACH-Raum', marginL, benchTitleY);
 
-  // personalisierter Satz über/unter Durchschnitt (simple Einordnung)
   const avgDachMid = 15;
   const direction = noShowRate >= avgDachMid ? 'über' : 'unter';
-  doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(13)
+  doc
+    .fillColor(COLOR_GRAY)
+    .font('Poppins-Light')
+    .fontSize(13)
     .text(`Deine No-Show-Rate liegt damit ${direction} dem Branchendurchschnitt.`, marginL, benchTitleY + 24);
 
   const benchY = benchTitleY + 62;
@@ -319,7 +365,7 @@ export function generatePdf(formData) {
     w: benchW,
     h: benchH,
     title: 'Deutschland',
-    lines: ['Ø No-Show-Rate', 'ca. 15–18 %']
+    lines: ['Ø No-Show-Rate', 'ca. 15-18 %']
   });
 
   drawOutlineTile({
@@ -328,7 +374,7 @@ export function generatePdf(formData) {
     w: benchW,
     h: benchH,
     title: 'Österreich',
-    lines: ['Ø No-Show-Rate', 'ca. 14–17 %']
+    lines: ['Ø No-Show-Rate', 'ca. 14-17 %']
   });
 
   drawOutlineTile({
@@ -337,10 +383,13 @@ export function generatePdf(formData) {
     w: benchW,
     h: benchH,
     title: 'Schweiz',
-    lines: ['Ø No-Show-Rate', 'ca. 12–15 %']
+    lines: ['Ø No-Show-Rate', 'ca. 12-15 %']
   });
 
-  doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(10)
+  doc
+    .fillColor(COLOR_GRAY)
+    .font('Poppins-Light')
+    .fontSize(10)
     .text('Quelle: Diese Zahlen sind aus aggregierten Branchenreports und Betreiberdaten.', marginL, benchY + benchH + 14);
 
   // =============================================================
@@ -349,10 +398,12 @@ export function generatePdf(formData) {
   if (hasOtherTool) {
     ensureNewPage();
 
-    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28)
-      .text('Dein Potenzial', marginL, 50);
+    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28).text('Dein Potenzial', marginL, 50);
 
-    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14)
+    doc
+      .fillColor(COLOR_GRAY)
+      .font('Poppins-Light')
+      .fontSize(14)
       .text(
         'So könnte sich dein Reservierungsumsatz entwickeln, wenn du deine No-Show-Rate auf < 0,3 % senkst und zusätzlich 15 % mehr Umsatz pro reserviertem Gast erzielst.',
         marginL,
@@ -365,7 +416,6 @@ export function generatePdf(formData) {
     const boxH = 360;
     const boxY = 140;
 
-    // Linke Kachel: bestehende Software
     drawBigCompareTile({
       x: marginL,
       y: boxY,
@@ -381,7 +431,6 @@ export function generatePdf(formData) {
       ]
     });
 
-    // Rechte Kachel: aleno
     drawBigCompareTile({
       x: marginL + boxW + boxGap,
       y: boxY,
@@ -399,13 +448,13 @@ export function generatePdf(formData) {
         '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
     });
 
-    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(10)
-      .text(
-        'Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.',
-        marginL,
-        pageH - 70,
-        { width: contentW }
-      );
+    doc
+      .fillColor(COLOR_GRAY)
+      .font('Poppins-Light')
+      .fontSize(10)
+      .text('Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.', marginL, pageH - 70, {
+        width: contentW
+      });
   }
 
   // =============================================================
@@ -413,20 +462,18 @@ export function generatePdf(formData) {
   // =============================================================
   ensureNewPage();
 
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28)
-    .text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
+  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28).text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
 
   const tipsX = marginL;
   let tipsY = 105;
 
   const tipTitle = (n, t) => {
-    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18).text(`${n}. ${t}`, tipsX, tipsY);
+    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18).text(`${n}. ${safeStr(t)}`, tipsX, tipsY);
     tipsY += 26;
   };
 
   const tipBody = (txt) => {
-    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14)
-      .text(txt, tipsX, tipsY, { width: contentW });
+    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14).text(safeStr(txt), tipsX, tipsY, { width: contentW });
     tipsY += 54;
   };
 
@@ -442,7 +489,7 @@ export function generatePdf(formData) {
 
   tipTitle(3, 'Ticketing für Events und Specials');
   tipBody(
-    'Lass Gäste nicht nur reservieren, sondern direkt buchen – z. B. Chef’s Table: Gäste wählen im Reservierungsprozess direkt ihr Menü und bezahlen im Voraus. Damit sicherst du dir Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste.'
+    "Lass Gäste nicht nur reservieren, sondern direkt buchen - z. B. Chef's Table: Gäste wählen im Reservierungsprozess direkt ihr Menü und bezahlen im Voraus. Damit sicherst du dir Umsätze, kannst gezielter einkaufen und steigerst die Vorfreude deiner Gäste."
   );
 
   tipTitle(4, 'Warteliste');
@@ -464,19 +511,22 @@ export function generatePdf(formData) {
   // =============================================================
   ensureNewPage();
 
-  // Dunkler Hintergrund
   doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
 
-  // Titel
-  doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(40)
+  doc
+    .fillColor(COLOR_WHITE)
+    .font('Poppins-Light')
+    .fontSize(40)
     .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
 
-  // Zwei Spalten Intro-Text
   const colGap = 30;
   const colW = (contentW - colGap) / 2;
   const colY = 165;
 
-  doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(14)
+  doc
+    .fillColor(COLOR_WHITE)
+    .font('Poppins-Light')
+    .fontSize(14)
     .text(
       'Der Digitale Assistent aleno ist eine smarte All-in-One-Lösung für Gästekommunikation, Tischreservierungen und Betriebsoptimierung in der Gastronomie.',
       marginL,
@@ -484,7 +534,10 @@ export function generatePdf(formData) {
       { width: colW }
     );
 
-  doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(14)
+  doc
+    .fillColor(COLOR_WHITE)
+    .font('Poppins-Light')
+    .fontSize(14)
     .text(
       'Die Software unterstützt dabei, Abläufe zu automatisisieren, Auslastung zu steigern und Gäste durch personalisierte Erlebnisse langfristig zu binden.',
       marginL + colW + colGap,
@@ -492,7 +545,6 @@ export function generatePdf(formData) {
       { width: colW }
     );
 
-  // Drei pinke KPI-Kacheln
   const pinkY = 265;
   const pinkGap = 18;
   const pinkW = (contentW - pinkGap * 2) / 3;
@@ -502,11 +554,13 @@ export function generatePdf(formData) {
     doc.save();
     doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
 
-    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(18)
-      .text(title, x + 18, pinkY + 16, { width: pinkW - 36 });
+    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(18).text(safeStr(title), x + 18, pinkY + 16, {
+      width: pinkW - 36
+    });
 
-    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(12)
-      .text(body, x + 18, pinkY + 42, { width: pinkW - 36 });
+    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(12).text(safeStr(body), x + 18, pinkY + 42, {
+      width: pinkW - 36
+    });
 
     doc.restore();
   };
@@ -515,10 +569,8 @@ export function generatePdf(formData) {
   pinkBox(marginL + pinkW + pinkGap, '< 0,5% No-Shows', 'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.');
   pinkBox(marginL + (pinkW + pinkGap) * 2, '5,2x ROI', 'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.');
 
-  // Vorteile
   const vY = 385;
-  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20)
-    .text('Deine Vorteile mit aleno:', marginL, vY);
+  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Deine Vorteile mit aleno:', marginL, vY);
 
   let by = vY + 34;
   const benefits = [
@@ -528,15 +580,14 @@ export function generatePdf(formData) {
     'Reduziere No-Shows und erhalte verbindliche Buchungen',
     'Behalte volle Kontrolle über deine Daten und deine Marke'
   ];
-  for (const b of benefits) {
+
+  for (const b of safeArr(benefits)) {
     drawCheckBullet({ x: marginL, y: by, text: b });
     by += 26;
   }
 
-  // Masterplan
   const mY = by + 22;
-  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20)
-    .text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
+  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
 
   let my = mY + 36;
   const master = [
@@ -545,16 +596,27 @@ export function generatePdf(formData) {
     { head: 'Starte direkt durch', text: 'Das aleno-Team richtet das System für dich ein.' }
   ];
 
-  for (const item of master) {
+  for (const item of safeArr(master)) {
+    const head = safeStr(item?.head, '');
+    const text = safeStr(item?.text, '');
+
     doc.fillColor(COLOR_PINK).font('Poppins-Bold').fontSize(14).text('•', marginL, my);
-    doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(14)
-      .text(`${item.head}:`, marginL + 16, my, { continued: true });
-    doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(14)
-      .text(` ${item.text}`, { width: contentW - 40 });
+
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Bold')
+      .fontSize(14)
+      .text(`${head}:`, marginL + 16, my, { continued: true });
+
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Light')
+      .fontSize(14)
+      .text(` ${text}`, { width: contentW - 40 });
+
     my += 26;
   }
 
-  // CTA Button
   drawCTAButton({
     x: marginL,
     y: pageH - 95,
