@@ -3,21 +3,24 @@ import fs from 'fs';
 import path from 'path';
 
 export function generatePdf(formData) {
-  // A4 quer
+  // A4 quer – Cover Full-Bleed (margin 0), Content-Seiten später margin 50
   const doc = new PDFDocument({
     size: 'A4',
     layout: 'landscape',
-    margin: 50
+    margin: 0
   });
 
   const get = (key) => formData?.[key] ?? '–';
 
-  // ------------------ Farben (Whitepaper-Feeling) ------------------
-  const COLOR_DARK = '#111827';
+  // ------------------ Farben (wie gewünscht) ------------------
+  const COLOR_DARK = '#282731';
   const COLOR_PINK = '#ff2e92';
-  const COLOR_GRAY = '#4b5563';
+
   const COLOR_BLACK = '#000000';
   const COLOR_WHITE = '#ffffff';
+
+  const COLOR_GRAY = '#4b5563';
+  const COLOR_SUB = '#d1d5db';
 
   const currency =
     formData.country === 'Schweiz' ||
@@ -73,9 +76,10 @@ export function generatePdf(formData) {
   const extraUpside15 = Math.max(revenueWithAlenoBase * 0.15, 0);
   const revenueWithAlenoPlus15 = revenueWithAlenoBase + extraUpside15;
 
-  const restaurantName = (get('restaurantName') && get('restaurantName') !== '–')
-    ? String(get('restaurantName'))
-    : 'dein Restaurant';
+  const restaurantName =
+    get('restaurantName') !== '–' && String(get('restaurantName')).trim()
+      ? String(get('restaurantName')).trim()
+      : 'dein Restaurant';
 
   // ------------------ Bedingungen für Seite 3 ------------------
   const hasOnline = String(get('hasOnlineReservation') || '');
@@ -84,15 +88,84 @@ export function generatePdf(formData) {
   const usesAleno = hasOnline === 'Ja' && reservationTool.includes('aleno');
   const hasOtherTool = hasOnline === 'Ja' && reservationToolRaw && !usesAleno;
 
-  // ------------------ Layout Helpers ------------------
+  // ------------------ Cover Assets (/public) ------------------
+  const COVER_IMAGE = path.join(process.cwd(), 'public', 'guests-restaurant.jpg');
+  const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-logo.png');
+
+  // =============================================================
+  // SEITE 1: TITELSEITE (wie Vorlage) – Full Bleed
+  // =============================================================
+  const coverW = doc.page.width;
+  const coverH = doc.page.height;
+
+  // Hintergrund
+  doc.rect(0, 0, coverW, coverH).fill(COLOR_DARK);
+
+  // Logo oben links
+  if (fs.existsSync(LOGO_IMAGE)) {
+    doc.image(LOGO_IMAGE, 55, 45, { width: 210 });
+  }
+
+  // Titel
+  doc
+    .fillColor(COLOR_WHITE)
+    .font('Helvetica')
+    .fontSize(56)
+    .text(
+      `No-Show-Report\nfür das Restaurant\n„${restaurantName}“`,
+      55,
+      270,
+      { width: coverW * 0.55, lineGap: 6 }
+    );
+
+  // Untertitel
+  doc
+    .fillColor(COLOR_SUB)
+    .font('Helvetica')
+    .fontSize(26)
+    .text('Zahlen, Vergleiche, Tipps', 55, 540, { width: coverW * 0.55 });
+
+  // Bild rechts mit 2 schrägen Kanten (links + unten)
+  if (fs.existsSync(COVER_IMAGE)) {
+    // Regler für die Schräge:
+    const xTopLeft = coverW * 0.62;
+    const yTopLeft = 90;
+    const xBottomLeft = coverW * 0.72;
+    const yBottomLeft = coverH * 0.78;
+
+    doc.save();
+
+    doc
+      .polygon(
+        xTopLeft, yTopLeft,      // oben links (schräge linke Kante)
+        coverW, 0,               // oben rechts
+        coverW, coverH,          // unten rechts
+        xBottomLeft, yBottomLeft // unten links (schräge Unterkante)
+      )
+      .clip();
+
+    // etwas größer platzieren, um keine Kanten zu riskieren
+    doc.image(COVER_IMAGE, coverW * 0.58, 0, {
+      width: coverW * 0.45,
+      height: coverH
+    });
+
+    doc.restore();
+  }
+
+  // =============================================================
+  // Ab Seite 2: Content Seiten mit Margin 50 (Rest wie gehabt)
+  // =============================================================
+  doc.addPage({ size: 'A4', layout: 'landscape', margin: 50 });
+
+  // Layout-Konstanten neu nach Page-Add (Margins ändern sich!)
   const pageW = doc.page.width;
   const pageH = doc.page.height;
   const marginL = doc.page.margins.left;
-  const marginT = doc.page.margins.top;
   const marginR = doc.page.margins.right;
-  const marginB = doc.page.margins.bottom;
   const contentW = pageW - marginL - marginR;
 
+  // ------------------ Layout Helpers ------------------
   const drawKpiTile = ({ x, y, w, h, title, value, bg = COLOR_BLACK, fg = COLOR_WHITE }) => {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).fill(bg);
@@ -150,7 +223,6 @@ export function generatePdf(formData) {
   };
 
   const drawCheckBullet = ({ x, y, text }) => {
-    // kleiner pinker Kreis + Häkchen-Effekt (vereinfacht) + Text
     doc.save();
     doc.fillColor(COLOR_PINK).circle(x + 6, y + 8, 6).fill();
     doc.fillColor(COLOR_WHITE).font('Helvetica-Bold').fontSize(10).text('✓', x + 3, y + 2);
@@ -162,35 +234,9 @@ export function generatePdf(formData) {
     doc.addPage({ size: 'A4', layout: 'landscape', margin: 50 });
   };
 
-  // ------------------ TITELSEITE ------------------
-  // Bildpfad (bitte anpassen, falls du es nicht in /public ablegst)
-  const IMAGE_PATH = path.join(process.cwd(), 'public', 'guests-restaurant.jpg');
-
-  // Hintergrund: Bild full-bleed (wenn vorhanden), sonst dunkles Feld
-  if (fs.existsSync(IMAGE_PATH)) {
-    doc.image(IMAGE_PATH, 0, 0, { width: pageW, height: pageH });
-    // dunkle Overlay-Fläche links (wie Whitepaper)
-    doc.save();
-    doc.fillOpacity(0.78).rect(0, 0, pageW * 0.52, pageH).fill(COLOR_DARK);
-    doc.restore();
-  } else {
-    doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
-  }
-
-  // Titel + Untertitel
-  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(44)
-    .text(`No-Show-Report`, marginL, 120, { width: pageW * 0.48 });
-
-  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(34)
-    .text(`für „${restaurantName}“`, marginL, 175, { width: pageW * 0.48 });
-
-  doc.moveDown(0.2);
-  doc.fillColor(COLOR_WHITE).font('Helvetica').fontSize(18)
-    .text('Zahlen, Vergleiche und konkrete Maßnahmen', marginL, 240, { width: pageW * 0.48 });
-
-  // ------------------ SEITE 2: Aktuelle No-Show-Situation ------------------
-  ensureNewPage();
-
+  // =============================================================
+  // SEITE 2: Aktuelle No-Show-Situation
+  // =============================================================
   doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
     .text('Deine aktuelle No-Show-Situation', marginL, 50);
 
@@ -234,7 +280,7 @@ export function generatePdf(formData) {
     .text('Vergleichszahlen von Restaurants aus dem DACH-Raum', marginL, benchTitleY);
 
   // personalisierter Satz über/unter Durchschnitt (simple Einordnung)
-  const avgDachMid = 15; // grobe Mitte der Spannweiten
+  const avgDachMid = 15;
   const direction = noShowRate >= avgDachMid ? 'über' : 'unter';
   doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(13)
     .text(`Deine No-Show-Rate liegt damit ${direction} dem Branchendurchschnitt.`, marginL, benchTitleY + 24);
@@ -274,7 +320,9 @@ export function generatePdf(formData) {
   doc.fillColor(COLOR_GRAY).font('Helvetica').fontSize(10)
     .text('Quelle: Diese Zahlen sind aus aggregierten Branchenreports und Betreiberdaten.', marginL, benchY + benchH + 14);
 
-  // ------------------ SEITE 3: Dein Potenzial (nur wenn anderes System im Einsatz) ------------------
+  // =============================================================
+  // SEITE 3: Dein Potenzial (nur wenn anderes System im Einsatz)
+  // =============================================================
   if (hasOtherTool) {
     ensureNewPage();
 
@@ -337,7 +385,9 @@ export function generatePdf(formData) {
       );
   }
 
-  // ------------------ SEITE 4: 4 Maßnahmen gegen No-Shows ------------------
+  // =============================================================
+  // SEITE 4: 4 wirksame Maßnahmen gegen No-Shows
+  // =============================================================
   ensureNewPage();
 
   doc.fillColor(COLOR_BLACK).font('Helvetica-Bold').fontSize(28)
@@ -386,10 +436,12 @@ export function generatePdf(formData) {
     link: 'https://www.aleno.me/de/blog/no-show-restaurant'
   });
 
-  // ------------------ SEITE 5: Whitepaper-Stil (Seite 30) + Demo-Button ------------------
+  // =============================================================
+  // SEITE 5: Whitepaper-Stil (Seite 30) + Demo-Button
+  // =============================================================
   ensureNewPage();
 
-  // Dunkler Hintergrund (wie Whitepaper)
+  // Dunkler Hintergrund
   doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
 
   // Titel
@@ -476,7 +528,7 @@ export function generatePdf(formData) {
     my += 26;
   }
 
-  // CTA Button statt QR
+  // CTA Button
   drawCTAButton({
     x: marginL,
     y: pageH - 95,
