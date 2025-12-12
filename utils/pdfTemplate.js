@@ -649,6 +649,5 @@ export function generatePdf(formData) {
   });
 
   // Ende: IMPORTANT – hier endet das Dokument, aber es wird NICHT gepiped (das macht send-report.js)
-  doc.end();
   return doc;
 }

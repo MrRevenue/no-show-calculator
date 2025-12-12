@@ -1,3 +1,5 @@
+console.log('SEND-REPORT LOADED', __filename);
+
 import nodemailer from 'nodemailer';
 import { PassThrough } from 'stream';
 import { generatePdf } from '../../utils/pdfTemplate';
@@ -51,6 +53,7 @@ export default async function handler(req, res) {
     // in Buffer streamen
     const pass = new PassThrough();
     doc.pipe(pass);
+    doc.end();
 
     const pdfBuffer = await streamToBuffer(pass);
 
