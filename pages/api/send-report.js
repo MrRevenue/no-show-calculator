@@ -1,5 +1,3 @@
-console.log('SEND-REPORT LOADED', __filename);
-
 import nodemailer from 'nodemailer';
 import { PassThrough } from 'stream';
 import { generatePdf } from '../../utils/pdfTemplate';
@@ -14,6 +12,9 @@ function streamToBuffer(readable) {
 }
 
 export default async function handler(req, res) {
+  // Debug: welche Datei läuft wirklich?
+  console.log('SEND-REPORT LOADED', __filename);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
@@ -21,7 +22,12 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {};
     const email = String(body.email || '').trim();
-    const firstName = body.firstName || '';
+    const firstName = String(body.firstName || '').trim();
+
+    console.log('ENV CHECK', {
+      hasUser: Boolean(process.env.GMAIL_USER),
+      hasPass: Boolean(process.env.GMAIL_APP_PASSWORD),
+    });
 
     if (!email) {
       return res.status(400).json({ success: false, error: 'Empfängeradresse fehlt' });
@@ -29,12 +35,6 @@ export default async function handler(req, res) {
 
     const gmailUser = process.env.GMAIL_USER;
     const gmailPass = process.env.GMAIL_APP_PASSWORD;
-
-    console.log('ENV CHECK', {
-  hasUser: Boolean(process.env.GMAIL_USER),
-  hasPass: Boolean(process.env.GMAIL_APP_PASSWORD),
-});
-
 
     if (!gmailUser || !gmailPass) {
       console.error('❌ Missing ENV:', {
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // PDF erzeugen (WICHTIG: pdfTemplate.js darf NICHT doc.pipe() machen)
+    // PDF erzeugen
     const doc = generatePdf(body);
 
     // in Buffer streamen
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
       to: email,
       cc: 'marketing@aleno.me',
       subject: 'Dein No-Show-Report',
-      text: `Hallo ${firstName},
+      text: `Hallo ${firstName || ''},
 
 im Anhang findest du deinen No-Show-Report.
 
