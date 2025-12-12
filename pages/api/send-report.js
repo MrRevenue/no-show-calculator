@@ -1,68 +1,114 @@
+console.log('SEND-REPORT LOADED');
+
 import nodemailer from 'nodemailer';
 import { PassThrough } from 'stream';
 import { generatePdf } from '../../utils/pdfTemplate';
 
+/**
+ * Stream → Buffer helper
+ */
 function streamToBuffer(readable) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    readable.on('data', (c) => chunks.push(c));
+    readable.on('data', (chunk) => chunks.push(chunk));
     readable.on('end', () => resolve(Buffer.concat(chunks)));
     readable.on('error', reject);
   });
 }
 
 export default async function handler(req, res) {
-  // Debug: welche Datei läuft wirklich?
-  console.log('SEND-REPORT LOADED', __filename);
-
+  // --------------------------------------------------
+  // METHOD CHECK
+  // --------------------------------------------------
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return res.status(405).json({
+      success: false,
+      error: 'Method not allowed',
+    });
   }
 
   try {
+    // --------------------------------------------------
+    // REQUEST DATA
+    // --------------------------------------------------
     const body = req.body || {};
     const email = String(body.email || '').trim();
     const firstName = String(body.firstName || '').trim();
 
-    console.log('ENV CHECK', {
-      hasUser: Boolean(process.env.GMAIL_USER),
-      hasPass: Boolean(process.env.GMAIL_APP_PASSWORD),
-    });
-
     if (!email) {
-      return res.status(400).json({ success: false, error: 'Empfängeradresse fehlt' });
+      return res.status(400).json({
+        success: false,
+        error: 'Empfängeradresse fehlt',
+      });
     }
 
+    // --------------------------------------------------
+    // ENV CHECK
+    // --------------------------------------------------
     const gmailUser = process.env.GMAIL_USER;
     const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
+    console.log('ENV CHECK', {
+      hasUser: Boolean(gmailUser),
+      hasPass: Boolean(gmailPass),
+    });
+
     if (!gmailUser || !gmailPass) {
-      console.error('❌ Missing ENV:', {
+      console.error('❌ Missing ENV', {
         hasUser: Boolean(gmailUser),
         hasPass: Boolean(gmailPass),
       });
+
       return res.status(500).json({
         success: false,
-        error: 'Server-Konfiguration fehlt (GMAIL_USER / GMAIL_APP_PASSWORD).',
+        error:
+          'Server-Konfiguration fehlt (GMAIL_USER / GMAIL_APP_PASSWORD).',
       });
     }
 
-    // PDF erzeugen
+    // --------------------------------------------------
+    // PDF GENERATION
+    // --------------------------------------------------
     const doc = generatePdf(body);
 
-    // in Buffer streamen
     const pass = new PassThrough();
+
+    doc.on('error', (err) => {
+      console.error('❌ PDFKIT ERROR', err);
+    });
+
+    pass.on('error', (err) => {
+      console.error('❌ STREAM ERROR', err);
+    });
+
     doc.pipe(pass);
-    doc.end();
+
+    // ✅ CRITICAL FIX:
+    // nur beenden, wenn noch nicht beendet
+    if (!doc._ended && !doc._ending) {
+      doc.end();
+    }
 
     const pdfBuffer = await streamToBuffer(pass);
 
-    // Mail versenden
+    if (!pdfBuffer || !pdfBuffer.length) {
+      throw new Error('PDF Buffer leer');
+    }
+
+    // --------------------------------------------------
+    // MAIL TRANSPORT
+    // --------------------------------------------------
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: { user: gmailUser, pass: gmailPass },
+      auth: {
+        user: gmailUser,
+        pass: gmailPass,
+      },
     });
 
+    // --------------------------------------------------
+    // SEND MAIL
+    // --------------------------------------------------
     await transporter.sendMail({
       from: `"No-Show Report" <${gmailUser}>`,
       to: email,
@@ -72,7 +118,8 @@ export default async function handler(req, res) {
 
 im Anhang findest du deinen No-Show-Report.
 
-Buche hier eine kostenlose Online-Demo: https://www.aleno.me/de/demo
+Buche hier eine kostenlose Online-Demo:
+https://www.aleno.me/de/demo
 
 Herzlichen Gruss
 Olaf`,
@@ -85,9 +132,16 @@ Olaf`,
       ],
     });
 
+    // --------------------------------------------------
+    // SUCCESS
+    // --------------------------------------------------
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error('❌ Fehler beim Versand/PDF:', err);
-    return res.status(500).json({ success: false, error: err?.message || String(err) });
+
+    return res.status(500).json({
+      success: false,
+      error: err?.message || String(err),
+    });
   }
 }
