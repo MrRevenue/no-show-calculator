@@ -28,6 +28,12 @@ export default async function handler(req, res) {
     const gmailUser = process.env.GMAIL_USER;
     const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
+    console.log('ENV CHECK', {
+  hasUser: Boolean(process.env.GMAIL_USER),
+  hasPass: Boolean(process.env.GMAIL_APP_PASSWORD),
+});
+
+
     if (!gmailUser || !gmailPass) {
       console.error('❌ Missing ENV:', {
         hasUser: Boolean(gmailUser),
