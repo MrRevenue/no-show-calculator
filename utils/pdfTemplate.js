@@ -10,6 +10,21 @@ export function generatePdf(formData) {
     margin: 0
   });
 
+  // ------------------ Fonts (Poppins) ------------------
+const FONT_LIGHT = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Light.ttf');
+const FONT_REGULAR = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Regular.ttf');
+const FONT_SEMIBOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-SemiBold.ttf');
+const FONT_BOLD = path.join(process.cwd(), 'public', 'fonts', 'Poppins-Bold.ttf');
+
+doc.registerFont('Poppins-Light', FONT_LIGHT);
+doc.registerFont('Poppins', FONT_REGULAR);
+doc.registerFont('Poppins-SemiBold', FONT_SEMIBOLD);
+doc.registerFont('Poppins-Bold', FONT_BOLD);
+
+// 👉 Standard-Font global setzen
+doc.font('Poppins-Light');
+
+
   const get = (key) => formData?.[key] ?? '–';
 
   // ------------------ Farben (wie gewünscht) ------------------
