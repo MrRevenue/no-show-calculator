@@ -209,6 +209,183 @@ if (fs.existsSync(TITLE_IMAGE)) {
 }
 
 
+// =============================================================
+// ZUSATZSEITE: "Deine Angaben" (zwischen Seite 1 und bisheriger Seite 2)
+// =============================================================
+
+// formAnswers: Objekt mit allen Antworten aus dem Formular
+// Beispiel: const formAnswers = reportInput.formAnswers;  // <-- bei euch anpassen!
+
+doc.addPage();
+
+const pageW = doc.page.width;
+const pageH = doc.page.height;
+
+const marginX = 55;
+const topY = 70;
+
+// Titel
+doc
+  .fillColor(COLOR_DARK) // wenn du dunklen Hintergrund nutzt -> COLOR_WHITE
+  .font('Poppins-SemiBold')
+  .fontSize(34)
+  .text('Deine Angaben', marginX, topY);
+
+// -------------------------------------------------------------
+// 1) Frage-Definitionen (Labels + optionale Formatter)
+//    -> Hier trägst du eure Keys ein
+// -------------------------------------------------------------
+const questionMap = {
+  restaurantName: { label: 'Restaurantname' },
+  periodFrom: { label: 'Zeitraum (von)' },
+  periodTo: { label: 'Zeitraum (bis)' },
+
+  hasReservationSystem: {
+    label: 'Reservierungssystem im Einsatz?',
+    format: v => (v ? 'Ja' : 'Nein')
+  },
+
+  // Folgefragen bei JA
+  reservationSystemName: { label: 'Welches System?' },
+  noShowPolicy: { label: 'No-Show Policy vorhanden?', format: v => (v ? 'Ja' : 'Nein') },
+
+  // Folgefragen bei NEIN
+  bookingMethod: { label: 'Wie werden Reservierungen aufgenommen?' },
+
+  // Beispiele für typische weitere Felder:
+  // avgGuests: { label: 'Ø Gäste pro Reservierung' },
+  // seatingCapacity: { label: 'Sitzplätze' },
+  // phone: { label: 'Telefon' },
+};
+
+// Hilfsformatierung (fallbacks, arrays, objects)
+const formatValue = (key, val) => {
+  const def = questionMap[key];
+
+  if (val === undefined || val === null || val === '') return '-';
+
+  if (def?.format) return def.format(val);
+
+  if (Array.isArray(val)) return val.filter(Boolean).join(', ');
+
+  if (typeof val === 'object') {
+    // falls mal ein Objekt kommt: möglichst lesbar machen
+    try { return JSON.stringify(val); } catch { return String(val); }
+  }
+
+  return String(val);
+};
+
+// -------------------------------------------------------------
+// 2) Dynamische Row-Generierung (zeigt nur relevante Fragen)
+// -------------------------------------------------------------
+const getRowsFromAnswers = (answers) => {
+  const rows = [];
+
+  // Basis (nur wenn vorhanden)
+  if (answers.restaurantName) rows.push({ key: 'restaurantName' });
+  if (answers.periodFrom) rows.push({ key: 'periodFrom' });
+  if (answers.periodTo) rows.push({ key: 'periodTo' });
+
+  // Steuerfrage + bedingte Folgefragen
+  if (typeof answers.hasReservationSystem === 'boolean') {
+    rows.push({ key: 'hasReservationSystem' });
+
+    if (answers.hasReservationSystem) {
+      if (answers.reservationSystemName) rows.push({ key: 'reservationSystemName' });
+      if (typeof answers.noShowPolicy === 'boolean') rows.push({ key: 'noShowPolicy' });
+    } else {
+      if (answers.bookingMethod) rows.push({ key: 'bookingMethod' });
+    }
+  }
+
+  // Optional: alle weiteren bekannten Keys, die befüllt sind, hinten dranhängen
+  const already = new Set(rows.map(r => r.key));
+  for (const k of Object.keys(answers)) {
+    if (already.has(k)) continue;
+    if (!questionMap[k]) continue; // nur Keys, die wir labeln können
+    const v = answers[k];
+    if (v === undefined || v === null || v === '') continue;
+    rows.push({ key: k });
+  }
+
+  // map -> {q,a}
+  return rows.map(({ key }) => ({
+    q: questionMap[key]?.label ?? key,
+    a: formatValue(key, answers[key]),
+  }));
+};
+
+// -------------------------------------------------------------
+// 3) 2-Spalten-Renderer (auto Höhe + Seitenumbruch)
+// -------------------------------------------------------------
+const tableTop = topY + 70;
+const gap = 18;
+
+const usableW = pageW - marginX * 2;
+const colQ = Math.floor(usableW * 0.52); // Frage links
+const colA = Math.floor(usableW * 0.48); // Antwort rechts
+
+const xQ = marginX;
+const xA = marginX + colQ + gap;
+
+let y = tableTop;
+
+const renderRow = ({ q, a }) => {
+  // Höhe berechnen
+  const qText = String(q ?? '-');
+  const aText = String(a ?? '-');
+
+  // Frage: SemiBold, Antwort: Light
+  doc.font('Poppins-SemiBold').fontSize(12);
+  const qH = doc.heightOfString(qText, { width: colQ, lineGap: 3 });
+
+  doc.font('Poppins-Light').fontSize(12);
+  const aH = doc.heightOfString(aText, { width: colA, lineGap: 3 });
+
+  const rowH = Math.max(qH, aH) + 14;
+
+  // Seitenumbruch
+  if (y + rowH > pageH - 70) {
+    doc.addPage();
+    y = 70;
+
+    // optional: Titel nicht wiederholen – wenn doch, hier erneut zeichnen
+  }
+
+  // Frage
+  doc
+    .fillColor('#111111') // bei dunklem BG -> COLOR_WHITE
+    .font('Poppins-SemiBold')
+    .fontSize(12)
+    .text(qText, xQ, y, { width: colQ, lineGap: 3 });
+
+  // Antwort
+  doc
+    .fillColor('#111111') // bei dunklem BG -> COLOR_WHITE
+    .font('Poppins-Light')
+    .fontSize(12)
+    .text(aText, xA, y, { width: colA, lineGap: 3 });
+
+  // Trennlinie (optional)
+  doc
+    .moveTo(marginX, y + rowH - 6)
+    .lineTo(pageW - marginX, y + rowH - 6)
+    .lineWidth(0.5)
+    .strokeColor('#DDDDDD')
+    .stroke();
+
+  y += rowH;
+};
+
+// -------------------------------------------------------------
+// 4) Rendern
+// -------------------------------------------------------------
+const rows = getRowsFromAnswers(formAnswers || {});
+rows.forEach(renderRow);
+
+
+
 
   // =============================================================
   // Ab Seite 2: Content Seiten mit Margin 50
