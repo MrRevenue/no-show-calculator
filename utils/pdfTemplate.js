@@ -135,7 +135,7 @@ doc.rect(0, 0, coverW, coverH).fill(COLOR_DARK);
 
 // aleno Logo links oben
 if (fs.existsSync(LOGO_IMAGE)) {
-  doc.image(LOGO_IMAGE, 55, 45, { width: 190 });
+  doc.image(LOGO_IMAGE, 55, 45, { width: 170 });
 }
 
 // ---- Helper: Text automatisch verkleinern, bis er reinpasst
@@ -196,10 +196,10 @@ doc
 
 // ---- Titelbild rechts oben: NICHT verzerren (fit statt width+height)
 if (fs.existsSync(TITLE_IMAGE)) {
-  const imgBoxX = coverW * 0.58;    // ab hier beginnt rechts der Bildbereich
+  const imgBoxX = coverW * 0.55;    // ab hier beginnt rechts der Bildbereich
   const imgBoxY = 0;
-  const imgBoxW = coverW * 0.42;
-  const imgBoxH = coverH * 0.72;
+  const imgBoxW = coverW * 0.45;
+  const imgBoxH = coverH * 0.85;
 
   doc.image(TITLE_IMAGE, imgBoxX, imgBoxY, {
     fit: [imgBoxW, imgBoxH],
