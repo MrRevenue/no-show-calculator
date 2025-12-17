@@ -121,64 +121,52 @@ export function generatePdf(formData) {
   const COVER_IMAGE = path.join(process.cwd(), 'public', 'guests-restaurant.jpg');
   const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-logo.png');
 
-  // =============================================================
-  // SEITE 1: TITELSEITE (Full Bleed)
-  // =============================================================
-  const coverW = doc.page.width;
-  const coverH = doc.page.height;
+// =============================================================
+// SEITE 1: TITELSEITE (ohne Polygon, mit fixer Bildfläche rechts)
+// =============================================================
+const coverW = doc.page.width;
+const coverH = doc.page.height;
 
-  // Hintergrund
-  doc.rect(0, 0, coverW, coverH).fill(COLOR_DARK);
+// Hintergrund
+doc.rect(0, 0, coverW, coverH).fill(COLOR_DARK);
 
-  // Logo oben links
-  if (fs.existsSync(LOGO_IMAGE)) {
-    doc.image(LOGO_IMAGE, 55, 45, { width: 210 });
-  }
+// Logo oben links
+if (fs.existsSync(LOGO_IMAGE)) {
+  doc.image(LOGO_IMAGE, 55, 45, { width: 210 });
+}
 
-  // Titel
-  doc
-    .fillColor(COLOR_WHITE)
-    .font('Poppins-Light')
-    .fontSize(56)
-    .text(`No-Show-Report\nfür das Restaurant\n„${restaurantName}“`, 55, 270, {
-      width: coverW * 0.55,
-      lineGap: 6
-    });
+// Rechts oben: Bild (dein fertiges titelbild.png)
+const TITLE_IMAGE = path.join(process.cwd(), 'public', 'titelbild.png');
 
-  // Untertitel
-  doc
-    .fillColor(COLOR_SUB)
-    .font('Poppins-Light')
-    .fontSize(26)
-    .text('Zahlen, Vergleiche, Tipps', 55, 540, { width: coverW * 0.55 });
+const rightX = coverW * 0.58;          // ab hier beginnt rechts der Bildbereich
+const rightY = 0;
+const rightW = coverW - rightX;        // Rest der Seite
+const rightH = coverH;
 
-  // Bild rechts mit 2 schrägen Kanten (links + unten)
-  if (fs.existsSync(COVER_IMAGE)) {
-    // Regler für die Schräge (wie dein aktuelles Template)
-    const xTopLeft = coverW * 0.62;
-    const yTopLeft = 90;
-    const xBottomLeft = coverW * 0.72;
-    const yBottomLeft = coverH * 0.78;
+if (fs.existsSync(TITLE_IMAGE)) {
+  doc.image(TITLE_IMAGE, rightX, rightY, {
+    width: rightW,
+    height: rightH
+  });
+}
 
-    doc.save();
+// Titel (links)
+const title = `No-Show-Report\nfür das Restaurant\n„${restaurantName}“`;
 
 doc
-  .polygon(
-    [xTopLeft, yTopLeft],
-    [coverW, 0],
-    [coverW, coverH],
-    [xBottomLeft, yBottomLeft]
-  )
-  .clip();
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(56)
+  .text(title, 55, 270, { width: coverW * 0.52, lineGap: 6 });
 
-    // etwas größer platzieren, um keine Kanten zu riskieren
-    doc.image(COVER_IMAGE, coverW * 0.58, 0, {
-      width: coverW * 0.45,
-      height: coverH
-    });
+// Untertitel
+doc
+  .fillColor('#d1d5db')
+  .font('Poppins-Light')
+  .fontSize(26)
+  .text('Zahlen, Vergleiche, Tipps', 55, 540, { width: coverW * 0.52 });
 
-    doc.restore();
-  }
+  
 
   // =============================================================
   // Ab Seite 2: Content Seiten mit Margin 50
