@@ -133,15 +133,9 @@ const TITLE_IMAGE = path.join(process.cwd(), 'public', 'titelbild.png');
 // Hintergrund
 doc.rect(0, 0, coverW, coverH).fill(COLOR_DARK);
 
-// Logo oben links
-const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-logo.png');
-
+// aleno Logo links oben
 if (fs.existsSync(LOGO_IMAGE)) {
-  doc.image(LOGO_IMAGE, 55, 45, {
-    width: 190,        // bewusst etwas kleiner & edel
-    align: 'left',
-    valign: 'top'
-  });
+  doc.image(LOGO_IMAGE, 55, 45, { width: 190 });
 }
 
 // ---- Helper: Text automatisch verkleinern, bis er reinpasst
