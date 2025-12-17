@@ -119,7 +119,7 @@ export function generatePdf(formData) {
 
   // ------------------ Assets (/public) ------------------
   const COVER_IMAGE = path.join(process.cwd(), 'public', 'guests-restaurant.jpg');
-  const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-logo.png');
+  const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-new_negativ.png');
 
 // =============================================================
 // SEITE 1: TITELSEITE (Full Bleed) – Bild NICHT verzerren + Titel auto-shrink
