@@ -196,13 +196,13 @@ doc
 
 // ---- Titelbild rechts oben: NICHT verzerren (fit statt width+height)
 if (fs.existsSync(TITLE_IMAGE)) {
-  const imgBoxX = coverW * 0.55;    // ab hier beginnt rechts der Bildbereich
+  const imgBoxX = coverW * 0.45;    // ab hier beginnt rechts der Bildbereich
   const imgBoxY = 0;
-  const imgBoxW = coverW * 0.45;
-  const imgBoxH = coverH * 0.85;
+  const imgBoxW = coverW * 0.55;
+  const imgBoxH = coverH * 0.90;
 
   doc.image(TITLE_IMAGE, imgBoxX, imgBoxY, {
-    fit: [imgBoxW, imgBoxH],
+    cover: [imgBoxW, imgBoxH],
     align: 'right',
     valign: 'top'
   });
