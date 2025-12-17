@@ -122,10 +122,13 @@ export function generatePdf(formData) {
   const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-logo.png');
 
 // =============================================================
-// SEITE 1: TITELSEITE (ohne Polygon, mit fixer Bildfläche rechts)
+// SEITE 1: TITELSEITE (Full Bleed) – Bild NICHT verzerren + Titel auto-shrink
 // =============================================================
 const coverW = doc.page.width;
 const coverH = doc.page.height;
+
+// Optional: neues Titelbild mit schrägen Kanten bereits "eingebacken"
+const TITLE_IMAGE = path.join(process.cwd(), 'public', 'titelbild.png');
 
 // Hintergrund
 doc.rect(0, 0, coverW, coverH).fill(COLOR_DARK);
@@ -135,38 +138,77 @@ if (fs.existsSync(LOGO_IMAGE)) {
   doc.image(LOGO_IMAGE, 55, 45, { width: 210 });
 }
 
-// Rechts oben: Bild (dein fertiges titelbild.png)
-const TITLE_IMAGE = path.join(process.cwd(), 'public', 'titelbild.png');
+// ---- Helper: Text automatisch verkleinern, bis er reinpasst
+const fitText = ({
+  text,
+  x,
+  y,
+  width,
+  maxHeight,
+  fontName = 'Poppins-Light',
+  maxFontSize = 56,
+  minFontSize = 30,
+  lineGap = 6,
+  color = COLOR_WHITE
+}) => {
+  let size = maxFontSize;
 
-const rightX = coverW * 0.58;          // ab hier beginnt rechts der Bildbereich
-const rightY = 0;
-const rightW = coverW - rightX;        // Rest der Seite
-const rightH = coverH;
+  doc.fillColor(color).font(fontName);
 
-if (fs.existsSync(TITLE_IMAGE)) {
-  doc.image(TITLE_IMAGE, rightX, rightY, {
-    width: rightW,
-    height: rightH
-  });
-}
+  while (size >= minFontSize) {
+    doc.fontSize(size);
+    const h = doc.heightOfString(text, { width, lineGap });
+    if (h <= maxHeight) break;
+    size -= 1;
+  }
 
-// Titel (links)
-const title = `No-Show-Report\nfür das Restaurant\n„${restaurantName}“`;
+  doc.text(text, x, y, { width, lineGap });
+  return size;
+};
 
-doc
-  .fillColor(COLOR_WHITE)
-  .font('Poppins-Light')
-  .fontSize(56)
-  .text(title, 55, 270, { width: coverW * 0.52, lineGap: 6 });
+// ---- Titel-Layout (links)
+const titleX = 55;
+const titleY = 220; // ggf. leicht nach oben/unten schieben
+const titleW = coverW * 0.58;
+const titleMaxH = 260; // Bereich, in den der Titel passen muss
+
+const titleText = `No-Show-Report\nfür das Restaurant\n„${restaurantName}“`;
+
+fitText({
+  text: titleText,
+  x: titleX,
+  y: titleY,
+  width: titleW,
+  maxHeight: titleMaxH,
+  maxFontSize: 56,
+  minFontSize: 30,
+  lineGap: 6,
+  fontName: 'Poppins-Light',
+  color: COLOR_WHITE
+});
 
 // Untertitel
 doc
-  .fillColor('#d1d5db')
+  .fillColor(COLOR_SUB)
   .font('Poppins-Light')
   .fontSize(26)
-  .text('Zahlen, Vergleiche, Tipps', 55, 540, { width: coverW * 0.52 });
+  .text('Zahlen, Vergleiche, Tipps', titleX, coverH - 120, { width: titleW });
 
-  
+// ---- Titelbild rechts oben: NICHT verzerren (fit statt width+height)
+if (fs.existsSync(TITLE_IMAGE)) {
+  const imgBoxX = coverW * 0.58;    // ab hier beginnt rechts der Bildbereich
+  const imgBoxY = 0;
+  const imgBoxW = coverW * 0.42;
+  const imgBoxH = coverH * 0.72;
+
+  doc.image(TITLE_IMAGE, imgBoxX, imgBoxY, {
+    fit: [imgBoxW, imgBoxH],
+    align: 'right',
+    valign: 'top'
+  });
+}
+
+
 
   // =============================================================
   // Ab Seite 2: Content Seiten mit Margin 50
