@@ -180,7 +180,7 @@ fitText({
   y: titleY,
   width: titleW,
   maxHeight: titleMaxH,
-  maxFontSize: 56,
+  maxFontSize: 42,
   minFontSize: 30,
   lineGap: 6,
   fontName: 'Poppins-Light',
