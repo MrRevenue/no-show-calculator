@@ -549,12 +549,14 @@ if (hasOtherTool) {
   const boxGap = 26;
   const boxW = (contentW - boxGap) / 2;
 
-  // ✅ deutlich kompakter
+  // etwas mehr Abstand zwischen Intro und Überschriften
   const headerY = afterIntroY + 22;
   const boxY = headerY + 26;
-  const boxH = 300; // <— so bleibt Platz für den Hinweis
 
-  // Überschriften
+  // Kachelhöhe (bei dir ggf. schon passend)
+  const boxH = 290;
+
+  // Überschriften über den Kacheln
   doc
     .fillColor(COLOR_BLACK)
     .font('Poppins-Bold')
@@ -567,7 +569,7 @@ if (hasOtherTool) {
     .fontSize(18)
     .text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
 
-  // Links
+  // Linke Kachel – bestehende Software (on top: ---)
   drawBigCompareTile({
     x: marginL,
     y: boxY,
@@ -581,16 +583,14 @@ if (hasOtherTool) {
         value: `${formatCurrency(revenueActual30)} ${currency}`
       },
       {
-        label: 'Zusätzliches Umsatzpotenzial',
-        value: `${formatCurrency(avoidableLossGross)} ${currency}`,
-        valueColor: COLOR_PINK,
-        valueSize: 18
+        label: 'Zusätzliches Umsatzpotenzial on top',
+        value: '—'
       },
       { label: 'Zeitersparnis', value: '0 Stunden' }
     ]
   });
 
-  // Rechts
+  // Rechte Kachel – aleno (on top: extraUpside15 + Brush-Underline)
   drawBigCompareTile({
     x: marginL + boxW + boxGap,
     y: boxY,
@@ -604,9 +604,10 @@ if (hasOtherTool) {
         value: `${formatCurrency(revenueWithAlenoBase)} ${currency}`
       },
       {
-        label: 'Zusätzliches Umsatzpotenzial*',
+        label: 'Zusätzliches Umsatzpotenzial on top',
         value: `${formatCurrency(extraUpside15)} ${currency}`,
-        valueSize: 18
+        valueSize: 18,
+        underlineValue: true
       },
       { label: 'Zeitersparnis', value: '14h pro Woche' }
     ],
@@ -614,7 +615,7 @@ if (hasOtherTool) {
       '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
   });
 
-  // ✅ Hinweis sicher auf Seite 3: direkt unter den Kacheln, aber nie unter den Seitenrand
+  // Hinweis unten (bleibt auf Seite 3)
   const hintY = Math.min(boxY + boxH + 24, pageH - 60);
 
   doc
@@ -628,7 +629,6 @@ if (hasOtherTool) {
       { width: contentW }
     );
 }
-
 
 
 
@@ -665,12 +665,12 @@ if (hasOtherTool) {
 
   tipTitle(1, 'Autom. Erinnerung');
   tipBody(
-    'Schicke 2 Tage vor dem Termin einen Hinweis auf den bevorstehenden Besuch mit der Möglichkeit, online zu stornieren (z. B. bis spätestens 24h vorher). So hast du die Möglichkeit, die Tische rechtzeitig neu zu vergeben.'
+    'Schicke 2 Tage vor dem Termin einen Hinweis auf den bevorstehenden Besuch mit der Möglichkeit, online zu stornieren (z. B. bis spätestens 24h vorher). So kannst du Tische rechtzeitig neu vergeben.'
   );
 
   tipTitle(2, 'Provisorische Reservierungen');
   tipBody(
-    'Kommuniziere bei der Reservierung, dass die Reservierung erst nach Bestätigung durch das Restaurant gültig ist. So kannst du im CRM prüfen, ob der Gast früher No-Shows generiert hat und ob es ein umsatzstarker Gast ist.'
+    'Kommuniziere bei der Reservierung, dass die Reservierung erst nach Bestätigung durch das Restaurant gültig ist. So kannst du im CRM prüfen, ob der Gast früher No-Shows generiert hat.'
   );
 
   tipTitle(3, 'Ticketing für Events und Specials');
