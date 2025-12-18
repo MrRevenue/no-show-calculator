@@ -713,7 +713,7 @@ doc
   .font('Poppins-Light')
   .fontSize(40)
   .text(
-    'Mit aleno Aufwand reduzieren\nund Umsatz steigern',
+    'Mit aleno den Erofolg maximal steigern',
     marginL,
     55,
     { width: contentW }
