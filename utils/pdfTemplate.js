@@ -544,7 +544,7 @@ if (hasOtherTool) {
   // ✅ deutlich kompakter
   const headerY = afterIntroY + 8;
   const boxY = headerY + 24;
-  const boxH = 290; // <— so bleibt Platz für den Hinweis
+  const boxH = 300; // <— so bleibt Platz für den Hinweis
 
   // Überschriften
   doc
@@ -633,13 +633,20 @@ if (hasOtherTool) {
   // =============================================================
   ensureNewPage();
 
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(28).text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
+  doc.fillColor(COLOR_BLACK).font('Poppins-Light').fontSize(28).text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
 
   const tipsX = marginL;
   let tipsY = 105;
 
   const tipTitle = (n, t) => {
-    doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18).text(`${n}. ${safeStr(t)}`, tipsX, tipsY);
+    tipsY += 14; // 👈 zusätzlicher Abstand vor der Überschrift
+
+    doc
+      .fillColor(COLOR_BLACK)
+      .font('Poppins-Bold')
+      .fontSize(18)
+      .text(`${n}. ${safeStr(t)}`, tipsX, tipsY);
+
     tipsY += 26;
   };
 
@@ -668,10 +675,13 @@ if (hasOtherTool) {
     'Wenn dein Restaurant gut gebucht ist, setze eine Warteliste ein, in die sich Gäste selbst eintragen können. Wird kurzfristig ein Tisch frei, kannst du dem nächsten passenden Gast den Tisch anbieten.'
   );
 
+  const ctaW = 320;
+  const ctaY = pageH - 110;
+
   drawCTAButton({
-    x: marginL,
-    y: pageH - 110,
-    w: 320,
+    x: marginL + (contentW - ctaW) / 2,
+    y: ctaY,
+    w: ctaW,
     h: 46,
     text: 'Mehr Tipps zur No-Show-Vermeidung',
     link: 'https://www.aleno.me/de/blog/no-show-restaurant'
