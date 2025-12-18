@@ -242,25 +242,51 @@ if (fs.existsSync(TITLE_IMAGE)) {
     doc.restore();
   };
 
-  const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
-    doc.save();
-    doc.roundedRect(x, y, w, h, 14).lineWidth(2).stroke(COLOR_BLACK);
+const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
+  doc.save();
+  doc.roundedRect(x, y, w, h, 14).lineWidth(2).stroke(COLOR_BLACK);
+
+  // Titel
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text(safeStr(title), x + 22, y + 20, { width: w - 44, align: 'left' });
+
+  // Lines: Strings ODER Objekte unterstützen
+  let cy = y + 58;
+
+  for (const ln of safeArr(lines)) {
+    // Alte Nutzung: String
+    if (typeof ln === 'string') {
+      doc
+        .fillColor(COLOR_GRAY)
+        .font('Poppins-Light')
+        .fontSize(14)
+        .text(safeStr(ln), x + 22, cy, { width: w - 44 });
+
+      cy += 22;
+      continue;
+    }
+
+    // Neue Nutzung: Objekt
+    const text = safeStr(ln?.text);
+    const font = safeStr(ln?.font, 'Poppins-Light');
+    const size = Number.isFinite(ln?.size) ? ln.size : 14;
+    const color = ln?.color || COLOR_GRAY;
+    const gap = Number.isFinite(ln?.gap) ? ln.gap : Math.max(6, Math.round(size * 0.6));
 
     doc
-      .fillColor(COLOR_BLACK)
-      .font('Poppins-Bold')
-      .fontSize(18)
-      .text(safeStr(title), x + 22, y + 20, { width: w - 44, align: 'left' });
+      .fillColor(color)
+      .font(font)
+      .fontSize(size)
+      .text(text, x + 22, cy, { width: w - 44 });
 
-    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14);
+    cy += size + gap;
+  }
 
-    let cy = y + 58;
-    for (const ln of safeArr(lines)) {
-      doc.text(safeStr(ln), x + 22, cy, { width: w - 44 });
-      cy += 22;
-    }
-    doc.restore();
-  };
+  doc.restore();
+};
 
   const drawBigCompareTile = ({ x, y, w, h, bg, header, items, footerNote }) => {
     doc.save();
@@ -369,7 +395,7 @@ if (fs.existsSync(TITLE_IMAGE)) {
     y: tileY,
     w: tileW,
     h: tileH,
-    title: 'Umsatzverlust durch No-Shows (30 Tage)',
+    title: 'Umsatzverlust (30 Tage)',
     value: `${formatCurrency(loss30 || netLoss30)} ${currency}`,
     bg: COLOR_BLACK
   });
@@ -403,7 +429,10 @@ if (fs.existsSync(TITLE_IMAGE)) {
     w: benchW,
     h: benchH,
     title: 'Deutschland',
-    lines: ['Ø No-Show-Rate', 'ca. 15–18 %']
+    lines: [
+      { text: 'Ø No-Show-Rate', font: 'Poppins-Light', size: 14, color: COLOR_GRAY },
+      { text: 'ca. 15–18 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_BLACK, gap: 0 }
+    ]
   });
 
   drawOutlineTile({
@@ -412,7 +441,10 @@ if (fs.existsSync(TITLE_IMAGE)) {
     w: benchW,
     h: benchH,
     title: 'Österreich',
-    lines: ['Ø No-Show-Rate', 'ca. 14–17 %']
+    lines: [
+      { text: 'Ø No-Show-Rate', font: 'Poppins-Light', size: 14, color: COLOR_GRAY },
+      { text: 'ca. 14–17 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_BLACK, gap: 0 }
+    ]
   });
 
   drawOutlineTile({
@@ -421,7 +453,10 @@ if (fs.existsSync(TITLE_IMAGE)) {
     w: benchW,
     h: benchH,
     title: 'Schweiz',
-    lines: ['Ø No-Show-Rate', 'ca. 12–15 %']
+    lines: [
+      { text: 'Ø No-Show-Rate', font: 'Poppins-Light', size: 14, color: COLOR_GRAY },
+      { text: 'ca. 12–15 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_BLACK, gap: 0 }
+    ]
   });
 
   doc
@@ -430,7 +465,10 @@ if (fs.existsSync(TITLE_IMAGE)) {
     .fontSize(10)
     .text('Quelle: Diese Zahlen sind aus aggregierten Branchenreports und Betreiberdaten.', marginL, benchY + benchH + 14);
 
-  // =============================================================
+  
+  
+  
+    // =============================================================
   // SEITE 3: Dein Potenzial (nur wenn anderes System im Einsatz)
   // =============================================================
   if (hasOtherTool) {
