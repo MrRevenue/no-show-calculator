@@ -2,6 +2,12 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 
+const BRUSH_WHITE = path.join(
+  process.cwd(),
+  'public',
+  'brush-white.png'
+);
+
 export function generatePdf(formData) {
   // A4 quer – Cover Full-Bleed (margin 0), Content-Seiten später margin 50
   const doc = new PDFDocument({
@@ -577,14 +583,14 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
 if (hasOtherTool) {
   ensureNewPage();
 
-  // Titel
+  // ------------------ Titel ------------------
   doc
     .fillColor(COLOR_BLACK)
     .font('Poppins-Light')
     .fontSize(28)
     .text('Dein Potenzial', marginL, 50);
 
-  // Intro
+  // ------------------ Intro ------------------
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
@@ -596,32 +602,13 @@ if (hasOtherTool) {
       { width: contentW }
     );
 
-  const afterIntroY = doc.y;
-
+  // ------------------ Layout ------------------
   const boxGap = 26;
   const boxW = (contentW - boxGap) / 2;
+  const boxH = 360;
+  const boxY = 150; // etwas Luft nach oben
 
-  // Abstand zwischen Intro und Überschriften
-  const headerY = afterIntroY + 22;
-  const boxY = headerY + 26;
-
-  // Kachelhöhe
-  const boxH = 290;
-
-  // Überschriften über den Kacheln
-  doc
-    .fillColor(COLOR_BLACK)
-    .font('Poppins-Bold')
-    .fontSize(18)
-    .text('Mit bestehender Software:', marginL, headerY, { width: boxW });
-
-  doc
-    .fillColor(COLOR_BLACK)
-    .font('Poppins-Bold')
-    .fontSize(18)
-    .text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
-
-  // Linke Kachel – bestehende Software (Zusätzliches Umsatzpotenzial: —)
+  // ------------------ Linke Box: Status quo ------------------
   drawBigCompareTile({
     x: marginL,
     y: boxY,
@@ -629,7 +616,10 @@ if (hasOtherTool) {
     h: boxH,
     bg: COLOR_BLACK,
     items: [
-      { label: 'No-Show-Rate', value: `${noShowRate.toFixed(1)} %` },
+      {
+        label: 'No-Show-Rate',
+        value: `${noShowRate.toFixed(1)} %`
+      },
       {
         label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
         value: `${formatCurrency(revenueActual30)} ${currency}`
@@ -638,11 +628,14 @@ if (hasOtherTool) {
         label: 'Zusätzliches Umsatzpotenzial',
         value: '—'
       },
-      { label: 'Zeitersparnis', value: '0 Stunden' }
+      {
+        label: 'Zeitersparnis',
+        value: '0 Stunden'
+      }
     ]
   });
 
-  // Rechte Kachel – aleno (Zusätzliches Umsatzpotenzial: extraUpside15 + Brush-Underline)
+  // ------------------ Rechte Box: Mit aleno ------------------
   drawBigCompareTile({
     x: marginL + boxW + boxGap,
     y: boxY,
@@ -650,7 +643,10 @@ if (hasOtherTool) {
     h: boxH,
     bg: COLOR_PINK,
     items: [
-      { label: 'No-Show-Rate', value: '< 0,3 %' },
+      {
+        label: 'No-Show-Rate',
+        value: '< 0,3 %'
+      },
       {
         label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
         value: `${formatCurrency(revenueWithAlenoBase)} ${currency}`
@@ -659,17 +655,18 @@ if (hasOtherTool) {
         label: 'Zusätzliches Umsatzpotenzial',
         value: `${formatCurrency(extraUpside15)} ${currency}`,
         valueSize: 18,
-        underlineValue: true
+        underlineValue: true   // 🎨 Brush-Stroke
       },
-      { label: 'Zeitersparnis', value: '14h pro Woche' }
+      {
+        label: 'Zeitersparnis',
+        value: '14h pro Woche'
+      }
     ],
     footerNote:
       '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
   });
 
-  // Hinweis unten (bleibt auf Seite 3)
-  const hintY = Math.min(boxY + boxH + 24, pageH - 60);
-
+  // ------------------ Hinweis unten ------------------
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
@@ -677,10 +674,11 @@ if (hasOtherTool) {
     .text(
       'Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.',
       marginL,
-      hintY,
+      pageH - 70,
       { width: contentW }
     );
 }
+
 
 
 
