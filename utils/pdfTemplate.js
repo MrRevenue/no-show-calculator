@@ -717,7 +717,7 @@ doc
 // ------------------ Intro (2 Spalten) ------------------
 const colGap = 30;
 const colW = (contentW - colGap) / 2;
-const introY = 155;
+const introY = 135;
 
 doc
   .fillColor(COLOR_WHITE)
@@ -805,8 +805,7 @@ let bY = vY + 32;
 
 for (const text of benefits) {
   // Bullet
-  doc.fillColor(COLOR_PINK).circle(marginL + 6, bY + 7, 6).fill();
-  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(10).text('✓', marginL + 3, bY + 1);
+doc.fillColor(COLOR_PINK).circle(marginL + 6, bY + 8, 5).fill();
 
   // Text
   doc
