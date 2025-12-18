@@ -697,172 +697,155 @@ if (hasOtherTool) {
 
 
   
-  // =============================================================
-  // SEITE 5: Whitepaper-Stil + Demo-Button
-  // =============================================================
-  ensureNewPage();
+// =============================================================
+// SEITE 5: Whitepaper-Stil + Demo-Button (stabil: kein Autopaging)
+// =============================================================
+ensureNewPage();
 
-  // Dunkler Hintergrund
-  doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
+// Dunkler Hintergrund
+doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
 
-  // Titel – gleiche Größe wie vorherige Seiten
-  doc
-    .fillColor(COLOR_WHITE)
-    .font('Poppins-Light')
-    .fontSize(28)
-    .text(
-      'Mit aleno Aufwand reduzieren\nund Umsatz steigern',
-      marginL,
-      55,
-      { width: contentW }
-    );
+// --- Layout-Konstanten
+const ctaW5 = 260;
+const ctaH5 = 46;
+const ctaX5 = marginL + contentW - ctaW5;
+const ctaY5 = pageH - 95;
 
-  // Abstand Titel → Intro-Text
-  const colGap = 30;
-  const colW = (contentW - colGap) / 2;
-  const colY = 155; // bewusst mehr Abstand zum Titel
+// Alles auf dieser Seite muss oberhalb hiervon bleiben (sonst Autopaging)
+const safeBottomY = ctaY5 - 20;
 
-  // Intro links
-  doc
-    .fillColor(COLOR_WHITE)
-    .font('Poppins-Light')
-    .fontSize(14)
-    .text(
-      'Der Digitale Assistent aleno ist eine smarte All-in-One-Lösung für Gästekommunikation, Tischreservierungen und Betriebsoptimierung in der Gastronomie.',
-      marginL,
-      colY,
-      { width: colW }
-    );
+// (1) Titel wie vorherige Seiten (Größe 28)
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(28)
+  .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
 
-  // Intro rechts
-  doc
-    .fillColor(COLOR_WHITE)
-    .font('Poppins-Light')
-    .fontSize(14)
-    .text(
-      'Die Software unterstützt dabei, Abläufe zu automatisisieren, Auslastung zu steigern und Gäste durch personalisierte Erlebnisse langfristig zu binden.',
-      marginL + colW + colGap,
-      colY,
-      { width: colW }
-    );
+// (2) Mehr Abstand Titel -> zweispaltiges Intro
+const colGap = 30;
+const colW = (contentW - colGap) / 2;
+const colY = 170; // mehr Abstand zum Titel als vorher
 
-  // Pinke KPI-Boxen – etwas höher
-  const pinkY = 245;
-  const pinkGap = 18;
-  const pinkW = (contentW - pinkGap * 2) / 3;
-  const pinkH = 90;
-
-  const drawPinkBox = (x, title, body) => {
-    doc.save();
-    doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
-
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Bold')
-      .fontSize(18)
-      .text(title, x + 18, pinkY + 16, { width: pinkW - 36 });
-
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Light')
-      .fontSize(12)
-      .text(body, x + 18, pinkY + 42, { width: pinkW - 36 });
-
-    doc.restore();
-  };
-
-  drawPinkBox(
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(14)
+  .text(
+    'Der Digitale Assistent aleno ist eine smarte All-in-One-Lösung für Gästekommunikation, Tischreservierungen und Betriebsoptimierung in der Gastronomie.',
     marginL,
-    '15% mehr Gäste',
-    "Die L'Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern."
+    colY,
+    { width: colW }
   );
 
-  drawPinkBox(
-    marginL + pinkW + pinkGap,
-    '<0,3% No-Shows',
-    'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.'
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(14)
+  .text(
+    'Die Software unterstützt dabei, Abläufe zu automatisisieren, Auslastung zu steigern und Gäste durch personalisierte Erlebnisse langfristig zu binden.',
+    marginL + colW + colGap,
+    colY,
+    { width: colW }
   );
 
-  drawPinkBox(
-    marginL + (pinkW + pinkGap) * 2,
-    '5,2x ROI',
-    'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.'
-  );
+// (3) Pinke KPI-Boxen deutlich höher
+const pinkY = 245; // höher als zuvor (war bei dir optisch noch zu tief)
+const pinkGap = 18;
+const pinkW = (contentW - pinkGap * 2) / 3;
+const pinkH = 90;
 
-  // Mehr Abstand zu "Deine Vorteile"
-  const vY = pinkY + pinkH + 55;
+const drawPinkBox = (x, title, body) => {
+  doc.save();
+  doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
 
   doc
     .fillColor(COLOR_WHITE)
     .font('Poppins-Bold')
-    .fontSize(20)
-    .text('Deine Vorteile mit aleno:', marginL, vY);
+    .fontSize(18)
+    .text(safeStr(title), x + 18, pinkY + 16, { width: pinkW - 36 });
 
-  let by = vY + 34;
-  const benefits = [
-    'Spare mehrere Stunden Arbeit pro Woche durch Automatisierung',
-    'Nutze 360-Grad-Gästeprofile für gezieltes und erfolgreiches Upselling',
-    'Optimiere die Auslastung durch KI-gestützte Tischzuweisung',
-    'Reduziere No-Shows und erhalte verbindliche Buchungen',
-    'Behalte volle Kontrolle über deine Daten und deine Marke'
-  ];
-
-  for (const b of benefits) {
-    drawCheckBullet({ x: marginL, y: by, text: b });
-    by += 26;
-  }
-
-  // Masterplan
-  const mY = by + 22;
   doc
     .fillColor(COLOR_WHITE)
-    .font('Poppins-Bold')
-    .fontSize(20)
-    .text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
+    .font('Poppins-Light')
+    .fontSize(12)
+    .text(safeStr(body), x + 18, pinkY + 42, { width: pinkW - 36 });
 
-  let my = mY + 36;
-  const master = [
-    { head: 'Buche eine kostenlose Live-Demo', text: 'Lerne die Möglichkeiten von aleno kennen.' },
-    { head: 'Erhalte eine individuelle Beratung', text: 'Entdecke Optimierungspotenziale für dein Restaurant oder Hotel.' },
-    { head: 'Starte direkt durch', text: 'Das aleno-Team richtet das System für dich ein.' }
-  ];
+  doc.restore();
+};
 
-  for (const item of master) {
-    doc
-      .fillColor(COLOR_PINK)
-      .font('Poppins-Bold')
-      .fontSize(14)
-      .text('•', marginL, my);
+drawPinkBox(
+  marginL,
+  '15% mehr Gäste',
+  "Die L'Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern."
+);
 
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Bold')
-      .fontSize(14)
-      .text(`${item.head}:`, marginL + 16, my, { continued: true });
+// (4) <0,5% -> <0,3%
+drawPinkBox(
+  marginL + pinkW + pinkGap,
+  '<0,3% No-Shows',
+  'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.'
+);
 
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Light')
-      .fontSize(14)
-      .text(` ${item.text}`, { width: contentW - 40 });
+drawPinkBox(
+  marginL + (pinkW + pinkGap) * 2,
+  '5,2x ROI',
+  'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.'
+);
 
-    my += 26;
-  }
+// (5) Mehr Abstand zwischen Boxen und "Deine Vorteile ..."
+const vY = pinkY + pinkH + 50;
+doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Deine Vorteile mit aleno:', marginL, vY);
 
-  // CTA-Button unten rechts (eindeutige Variablennamen!)
-  const ctaW5 = 260;
-  const ctaH5 = 46;
-  const ctaX5 = marginL + contentW - ctaW5;
-  const ctaY5 = pageH - 95;
+// Vorteile (kompakter, damit sicher alles auf Seite 5 bleibt)
+let by = vY + 32;
+const benefits = [
+  'Spare mehrere Stunden Arbeit pro Woche durch Automatisierung',
+  'Nutze 360-Grad-Gästeprofile für gezieltes und erfolgreiches Upselling',
+  'Optimiere die Auslastung durch KI-gestützte Tischzuweisung',
+  'Reduziere No-Shows und erhalte verbindliche Buchungen',
+  'Behalte volle Kontrolle über deine Daten und deine Marke'
+];
 
-  drawCTAButton({
-    x: ctaX5,
-    y: ctaY5,
-    w: ctaW5,
-    h: ctaH5,
-    text: 'Jetzt Demo buchen',
-    link: 'https://www.aleno.me/de/demo'
+for (const b of safeArr(benefits)) {
+  // Sicherheit: nicht über safeBottomY laufen
+  if (by > safeBottomY - 110) break;
+  drawCheckBullet({ x: marginL, y: by, text: b });
+  by += 24; // etwas enger als vorher (war 26)
+}
+
+// Masterplan – als BOX (kein Autopaging mehr!)
+const mY = by + 14;
+doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
+
+const masterText =
+  '• Buche eine kostenlose Live-Demo – Lerne die Möglichkeiten von aleno kennen.\n' +
+  '• Erhalte eine individuelle Beratung – Entdecke Optimierungspotenziale für dein Restaurant oder Hotel.\n' +
+  '• Starte direkt durch – Das aleno-Team richtet das System für dich ein.';
+
+const masterBoxY = mY + 30;
+const masterBoxH = Math.max(40, safeBottomY - masterBoxY - 10); // füllt den Raum bis über den CTA
+
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(13)
+  .text(masterText, marginL, masterBoxY, {
+    width: contentW,
+    height: masterBoxH,     // <-- verhindert neue Seiten
+    lineGap: 3,
+    ellipsis: true
   });
+
+// (6) CTA unten rechts AUF SEITE 5
+drawCTAButton({
+  x: ctaX5,
+  y: ctaY5,
+  w: ctaW5,
+  h: ctaH5,
+  text: 'Jetzt Demo buchen',
+  link: 'https://www.aleno.me/de/demo'
+});
+
 
 
   // Ende: IMPORTANT – hier endet das Dokument, aber es wird NICHT gepiped (das macht send-report.js)
