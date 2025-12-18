@@ -293,53 +293,71 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     doc.roundedRect(x, y, w, h, 16).fill(bg);
 
     const padX = 26;
+    const padTop = 28;
+    const padBottom = 18;
+
     const innerW = w - padX * 2;
 
-    let cy = y + 34;
+    // 2-Spalten-Layout
+    const valueColW = 150;                 // Wert-Spalte rechts (fix, stabil)
+    const labelColW = innerW - valueColW;  // Label links (wrapt sauber)
 
-    const labelSize = 15;
+    // Footer reservieren (falls vorhanden)
+    const footerFontSize = 9;
+    const footerH = footerNote ? 44 : 0;
+    const footerY = y + h - footerH;
+
+    let cy = y + padTop;
+
+    // Typo Defaults
+    const labelSizeDefault = 14;
     const valueSizeDefault = 16;
-    const lineGap = 18;
+    const rowGap = 10; // sichtbarer Abstand zwischen Rows
 
     for (const it of safeArr(items)) {
       const label = safeStr(it?.label);
       const value = safeStr(it?.value);
 
-      const valueSize = it?.valueSize || valueSizeDefault;
+      const labelSize = Number.isFinite(it?.labelSize) ? it.labelSize : labelSizeDefault;
+      const valueSize = Number.isFinite(it?.valueSize) ? it.valueSize : valueSizeDefault;
       const valueColor = it?.valueColor || COLOR_WHITE;
 
-      // Label (normal)
+      // Höhen für sauberen Umbruch bestimmen
+      doc.font('Poppins-Light').fontSize(labelSize);
+      const labelH = doc.heightOfString(label, { width: labelColW });
+
+      doc.font('Poppins-Bold').fontSize(valueSize);
+      const valueH = doc.heightOfString(value, { width: valueColW });
+
+      const rowH = Math.max(labelH, valueH);
+
+      // Stop, wenn wir in den Footer laufen würden
+      if (cy + rowH > footerY - padBottom) break;
+
+      // Label links
       doc
         .fillColor(COLOR_WHITE)
         .font('Poppins-Light')
         .fontSize(labelSize)
-        .text(label, x + padX, cy, { continued: true });
+        .text(label, x + padX, cy, { width: labelColW });
 
-      // Abstand zwischen Text und Zahl
-      doc.text('  ', { continued: true });
-
-      // Value (bold)
+      // Value rechts (rechtsbündig)
       doc
         .fillColor(valueColor)
         .font('Poppins-Bold')
         .fontSize(valueSize)
-        .text(value, {
-          width: innerW,
-          lineBreak: true
-        });
+        .text(value, x + padX + labelColW, cy, { width: valueColW, align: 'right' });
 
-      cy += lineGap;
+      cy += rowH + rowGap;
     }
 
-    // Footer (falls vorhanden)
+    // Footer unten
     if (footerNote) {
       doc
         .fillColor(COLOR_WHITE)
         .font('Poppins-Light')
-        .fontSize(10)
-        .text(safeStr(footerNote), x + padX, y + h - 40, {
-          width: innerW
-        });
+        .fontSize(footerFontSize)
+        .text(safeStr(footerNote), x + padX, y + h - 38, { width: innerW });
     }
 
     doc.restore();
@@ -520,21 +538,28 @@ if (hasOtherTool) {
 
   const afterIntroY = doc.y;
 
-  // Layout
   const boxGap = 26;
   const boxW = (contentW - boxGap) / 2;
-  const boxH = 300; // ✅ deutlich niedriger
-  const headerY = afterIntroY + 10;
-  const boxY = headerY + 28;
+
+  // ✅ deutlich kompakter
+  const headerY = afterIntroY + 8;
+  const boxY = headerY + 24;
+  const boxH = 255; // <— so bleibt Platz für den Hinweis
 
   // Überschriften
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18)
-    .text('Mit bestehender Software:', marginL, headerY);
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text('Mit bestehender Software:', marginL, headerY, { width: boxW });
 
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18)
-    .text('Mit aleno:', marginL + boxW + boxGap, headerY);
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
 
-  // Linke Kachel
+  // Links
   drawBigCompareTile({
     x: marginL,
     y: boxY,
@@ -557,7 +582,7 @@ if (hasOtherTool) {
     ]
   });
 
-  // Rechte Kachel
+  // Rechts
   drawBigCompareTile({
     x: marginL + boxW + boxGap,
     y: boxY,
@@ -581,7 +606,9 @@ if (hasOtherTool) {
       '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
   });
 
-  // Hinweis (bleibt jetzt sicher auf Seite 3)
+  // ✅ Hinweis sicher auf Seite 3: direkt unter den Kacheln, aber nie unter den Seitenrand
+  const hintY = Math.min(boxY + boxH + 18, pageH - 60);
+
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
@@ -589,10 +616,11 @@ if (hasOtherTool) {
     .text(
       'Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.',
       marginL,
-      pageH - 60,
+      hintY,
       { width: contentW }
     );
 }
+
 
 
 
