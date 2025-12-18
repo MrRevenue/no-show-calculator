@@ -292,33 +292,51 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     doc.save();
     doc.roundedRect(x, y, w, h, 16).fill(bg);
 
-    // Content-Start innerhalb der Kachel
-    let cy = y + 40;
+    const padX = 26;
+    const innerW = w - padX * 2;
+
+    const topPad = 34;
+
+    // Footer reservieren (nur wenn vorhanden)
+    const footerH = footerNote ? 58 : 0;
+    const footerY = y + h - footerH;
+
+    let cy = y + topPad;
+
+    // Defaults
+    const baseLabelSize = 15;
+    const baseValueSize = 17;
+    const betweenLabelValue = 6;
+    const blockGap = 16;
 
     for (const it of safeArr(items)) {
       const label = safeStr(it?.label);
       const value = safeStr(it?.value);
 
-      // 1) Label = normal (wie bisher die Zahl)
-      doc.fillColor(COLOR_WHITE).font('Poppins-Light').fontSize(16);
-      doc.text(label, x + 26, cy, { width: w - 52 });
+      // pro Item überschreibbar
+      const labelSize = Number.isFinite(it?.labelSize) ? it.labelSize : baseLabelSize;
+      const valueSize = Number.isFinite(it?.valueSize) ? it.valueSize : baseValueSize;
 
-      // Höhe des Labels korrekt berechnen (wichtig bei Umbruch!)
-      const labelH = doc.heightOfString(label, { width: w - 52 });
+      const labelColor = it?.labelColor || COLOR_WHITE;
+      const valueColor = it?.valueColor || COLOR_WHITE;
 
-      // 2) Value = bold (wie bisher das Label)
-      const valueY = cy + labelH + 6;
-      doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(16);
-      doc.text(value, x + 26, valueY, { width: w - 52 });
+      // Label (normal)
+      doc.fillColor(labelColor).font('Poppins-Light').fontSize(labelSize);
+      doc.text(label, x + padX, cy, { width: innerW });
 
-      const valueH = doc.heightOfString(value, { width: w - 52 });
+      const labelH = doc.heightOfString(label, { width: innerW });
 
-      // Abstand zum nächsten Block
-      cy = valueY + valueH + 22;
+      // Value (bold)
+      const valueY = cy + labelH + betweenLabelValue;
+      doc.fillColor(valueColor).font('Poppins-Bold').fontSize(valueSize);
+      doc.text(value, x + padX, valueY, { width: innerW });
 
-      // Safety: nicht in den Footer laufen
-      if (footerNote && cy > y + h - 90) break;
-      if (!footerNote && cy > y + h - 50) break;
+      const valueH = doc.heightOfString(value, { width: innerW });
+
+      cy = valueY + valueH + blockGap;
+
+      // nicht in den Footer laufen
+      if (footerNote && cy > footerY - 10) break;
     }
 
     if (footerNote) {
@@ -326,11 +344,13 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
         .fillColor(COLOR_WHITE)
         .font('Poppins-Light')
         .fontSize(10)
-        .text(safeStr(footerNote), x + 26, y + h - 48, { width: w - 52 });
+        .text(safeStr(footerNote), x + padX, y + h - 48, { width: innerW });
     }
 
     doc.restore();
   };
+
+
 
   const drawCTAButton = ({ x, y, w, h, text, link }) => {
     doc.save();
@@ -481,9 +501,14 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
 if (hasOtherTool) {
   ensureNewPage();
 
-  // (1) Titel: gleiche Größe, aber Poppins-Light
-  doc.fillColor(COLOR_BLACK).font('Poppins-Light').fontSize(28).text('Dein Potenzial', marginL, 50);
+  // Titel
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Light')
+    .fontSize(28)
+    .text('Dein Potenzial', marginL, 50);
 
+  // Intro-Text
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
@@ -495,16 +520,31 @@ if (hasOtherTool) {
       { width: contentW }
     );
 
+  // Dynamische Y-Position nach Intro
+  const afterIntroY = doc.y;
+
+  // Layout
   const boxGap = 26;
   const boxW = (contentW - boxGap) / 2;
-  const boxH = 360;
-  const boxY = 140;
+  const boxH = 380;
 
-  // (2) Überschriften ÜBER den Kacheln in schwarz
-  const headerY = boxY - 34;
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18).text('Mit bestehender Software:', marginL, headerY, { width: boxW });
-  doc.fillColor(COLOR_BLACK).font('Poppins-Bold').fontSize(18).text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
+  const headerY = afterIntroY + 10;
+  const boxY = headerY + 28;
 
+  // Überschriften über den Kacheln
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text('Mit bestehender Software:', marginL, headerY, { width: boxW });
+
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
+
+  // Linke Kachel – bestehende Software
   drawBigCompareTile({
     x: marginL,
     y: boxY,
@@ -513,12 +553,27 @@ if (hasOtherTool) {
     bg: COLOR_BLACK,
     items: [
       { label: 'No-Show-Rate', value: `${noShowRate.toFixed(1)} %` },
-      { label: 'Gesamt-Umsatz über Reservierungen (30 Tage)', value: `${formatCurrency(revenueActual30)} ${currency}` },
-      { label: 'Zusätzliches Umsatzpotenzial', value: `${formatCurrency(avoidableLossGross)} ${currency}` },
+
+      // optional: Umsatz leicht größer
+      {
+        label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
+        value: `${formatCurrency(revenueActual30)} ${currency}`,
+        valueSize: 18
+      },
+
+      // ✅ Highlight: zusätzliches Umsatzpotenzial (größer + pink)
+      {
+        label: 'Zusätzliches Umsatzpotenzial',
+        value: `${formatCurrency(avoidableLossGross)} ${currency}`,
+        valueSize: 20,
+        valueColor: COLOR_PINK
+      },
+
       { label: 'Zeitersparnis', value: '0 Stunden' }
     ]
   });
 
+  // Rechte Kachel – aleno
   drawBigCompareTile({
     x: marginL + boxW + boxGap,
     y: boxY,
@@ -527,23 +582,39 @@ if (hasOtherTool) {
     bg: COLOR_PINK,
     items: [
       { label: 'No-Show-Rate', value: '< 0,3 %' },
-      { label: 'Gesamt-Umsatz über Reservierungen (30 Tage)', value: `${formatCurrency(revenueWithAlenoBase)} ${currency}` },
-      { label: 'Zusätzliches Umsatzpotenzial*', value: `${formatCurrency(extraUpside15)} ${currency}` },
-      // (5) Sonderzeichen entfernen
+
+      {
+        label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
+        value: `${formatCurrency(revenueWithAlenoBase)} ${currency}`,
+        valueSize: 18
+      },
+
+      // ✅ Highlight: zusätzliches Umsatzpotenzial (größer)
+      {
+        label: 'Zusätzliches Umsatzpotenzial*',
+        value: `${formatCurrency(extraUpside15)} ${currency}`,
+        valueSize: 22
+      },
+
       { label: 'Zeitersparnis', value: '14h pro Woche' }
     ],
     footerNote:
       '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
   });
 
+  // Hinweis unten
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
     .fontSize(10)
-    .text('Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.', marginL, pageH - 70, {
-      width: contentW
-    });
+    .text(
+      'Hinweis: Die dargestellten Potenziale beruhen auf deinen Eingaben und einer 30-Tage-Hochrechnung.',
+      marginL,
+      pageH - 70,
+      { width: contentW }
+    );
 }
+
 
 
 
