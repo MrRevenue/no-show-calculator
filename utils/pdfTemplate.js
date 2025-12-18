@@ -713,7 +713,7 @@ doc
   .font('Poppins-Light')
   .fontSize(40)
   .text(
-    'Mit aleno den Erofolg maximal steigern',
+    'Mit aleno erfolgreicher werden',
     marginL,
     55,
     { width: contentW }
