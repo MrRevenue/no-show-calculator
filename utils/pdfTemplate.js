@@ -351,28 +351,55 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
 
       // ✅ Brush-Underline (optional) – NACH dem Value zeichnen!
       if (it?.underlineValue) {
-        // sicherstellen, dass widthOfString mit derselben Font/Size arbeitet
         doc.font('Poppins-Bold').fontSize(valueSize);
+        const textW = doc.widthOfString(value);
 
-        const valueTextW = doc.widthOfString(value);
-
-        // rechte Kante der Value-Spalte
         const valueBoxX = x + padX + labelColW;
-        const underlineX2 = valueBoxX + valueColW;
-        const underlineX1 = underlineX2 - valueTextW;
+        const x2 = valueBoxX + valueColW;
+        const x1 = x2 - textW;
 
-        const underlineY = cy + valueSize + 6;
+        const baseY = cy + valueSize + 8;
 
         doc.save();
         doc.strokeColor(COLOR_WHITE);
         doc.lineCap('round');
 
-        // Pinsel-Effekt: 2 Striche, leicht versetzt
-        doc.lineWidth(6).moveTo(underlineX1, underlineY).lineTo(underlineX2, underlineY).stroke();
-        doc.lineWidth(3).moveTo(underlineX1 + 2, underlineY + 2).lineTo(underlineX2 - 2, underlineY + 2).stroke();
+        // Hauptstrich (leicht gebogen)
+        doc
+          .lineWidth(5)
+          .opacity(0.9)
+          .moveTo(x1, baseY)
+          .bezierCurveTo(
+            x1 + textW * 0.25, baseY + 3,
+            x1 + textW * 0.55, baseY - 2,
+            x2, baseY + 1
+          )
+          .stroke();
+
+        // Zweiter „Borsten“-Strich (versetzt, dünner)
+        doc
+          .lineWidth(3)
+          .opacity(0.7)
+          .moveTo(x1 + 4, baseY + 3)
+          .bezierCurveTo(
+            x1 + textW * 0.3, baseY + 6,
+            x1 + textW * 0.6, baseY + 2,
+            x2 - 6, baseY + 4
+          )
+          .stroke();
+
+        // Optional: dritter Mini-Strich für Textur
+        doc
+          .lineWidth(2)
+          .opacity(0.4)
+          .moveTo(x1 + 10, baseY + 6)
+          .lineTo(x2 - 14, baseY + 6)
+          .stroke();
 
         doc.restore();
       }
+      
+      
       cy += rowH + rowGap;
     }
 
