@@ -113,7 +113,7 @@ export function generatePdf(formData) {
   const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-new_negativ.png');
 
   // =============================================================
-  // SEITE 1: TITELSEITE (Full Bleed) – (Änderungen rückgängig)
+  // SEITE 1: TITELSEITE (Full Bleed)
   // =============================================================
   const coverW = doc.page.width;
   const coverH = doc.page.height;
@@ -153,7 +153,6 @@ export function generatePdf(formData) {
     return size;
   };
 
-  // ✅ zurück auf vorheriges Layout
   const titleX = 55;
   const titleY = 220;
   const titleW = coverW * 0.58;
@@ -209,7 +208,6 @@ export function generatePdf(formData) {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).fill(bg);
 
-    // ✅ Titel größer + fetter
     doc
       .fillColor(fg)
       .font('Poppins-SemiBold')
@@ -274,20 +272,17 @@ export function generatePdf(formData) {
 
     const innerW = w - padX * 2;
 
-    // 2-Spalten-Layout
     const valueColW = 150;
     const labelColW = innerW - valueColW;
 
-    // ✅ Footer höher + genug Platz für 2 Zeilen + keine neue Seite
     const footerFontSize = 11;
     const footerLineGap = 2;
-    const footerLinesReserve = footerNote ? 3 : 0; // sicherheitshalber
+    const footerLinesReserve = footerNote ? 3 : 0;
     const footerH = footerNote ? Math.max(74, footerLinesReserve * (footerFontSize + footerLineGap) + 18) : 0;
     const footerY = y + h - footerH;
 
     let cy = y + padTop;
 
-    // ✅ Labels (Item-Texte) größer + etwas fetter (nicht so fett wie Values)
     const labelSizeDefault = 15;
     const valueSizeDefault = 16;
     const rowGap = 10;
@@ -324,7 +319,7 @@ export function generatePdf(formData) {
         .fontSize(valueSize)
         .text(value, valueBoxX, cy, { width: valueColW, align: 'right' });
 
-      // ✅ Pinselstrich dicker
+      // Pinselstrich dicker (für underlineValue)
       if (it?.underlineValue && typeof BRUSH_WHITE !== 'undefined' && fs.existsSync(BRUSH_WHITE)) {
         doc.font('Poppins-Bold').fontSize(valueSize);
         const textW = doc.widthOfString(value);
@@ -333,7 +328,7 @@ export function generatePdf(formData) {
         const x1 = x2 - textW;
 
         const imgY = cy + valueSize + 2;
-        const imgH = 22; // ✅ dicker als vorher (18)
+        const imgH = 22;
 
         doc.save();
         doc.opacity(0.98);
@@ -344,7 +339,6 @@ export function generatePdf(formData) {
       cy += rowH + rowGap;
     }
 
-    // ✅ Footer-Text mit erzwungener Höhe + korrektem Zeilenumbruch
     if (footerNote) {
       doc
         .fillColor(COLOR_WHITE)
@@ -431,7 +425,6 @@ export function generatePdf(formData) {
   const benchW = (contentW - benchGap * 2) / 3;
   const benchH = 120;
 
-  // ✅ Titel + Prozentwert zentriert
   drawOutlineTile({
     x: marginL,
     y: benchY,
@@ -472,7 +465,7 @@ export function generatePdf(formData) {
     .text('Quelle: Diese Zahlen sind aus aggregierten Branchenreports und Betreiberdaten.', marginL, benchY + benchH + 14);
 
   // =============================================================
-  // SEITE 3: Dein Potenzial (logik erweitert)
+  // SEITE 3: Dein Potenzial
   // =============================================================
   const shouldShowPotentialPage = hasOtherTool || usesAleno || hasOnline === 'Nein';
 
@@ -503,7 +496,6 @@ export function generatePdf(formData) {
 
     const boxH = Math.max(260, (hintY - bottomReserve) - boxY);
 
-    // ✅ Dynamische Titel je nach Setup
     let leftTitle = 'Mit bestehender Software:';
     let rightTitle = 'Mit aleno:';
 
@@ -525,6 +517,9 @@ export function generatePdf(formData) {
       .fontSize(18)
       .text(rightTitle, marginL + boxW + boxGap, headerY, { width: boxW });
 
+    // ✅ kürzerer Label-Text (passt besser mit SemiBold)
+    const revenueLabel = 'Reservierungs-Umsatz (30 Tage)';
+
     drawBigCompareTile({
       x: marginL,
       y: boxY,
@@ -534,7 +529,7 @@ export function generatePdf(formData) {
       items: [
         { label: 'No-Show-Rate', value: `${noShowRate.toFixed(1)} %` },
         {
-          label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
+          label: revenueLabel,
           value: `${formatCurrency(revenueActual30)} ${currency}`
         },
         { label: 'Zusätzliches Umsatzpotenzial', value: '—' },
@@ -542,10 +537,10 @@ export function generatePdf(formData) {
       ]
     });
 
-    // ✅ Explainer mit erzwungenem Zeilenumbruch (damit er exakt so wie gewünscht umbricht)
+    // ✅ Kein Umbruch nach "360-Grad-"
     const footerNoteText =
-      '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-\n' +
-      'Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.';
+      '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling,\n' +
+      'gezielte Ansprache umsatzstarker Gäste etc.';
 
     drawBigCompareTile({
       x: marginL + boxW + boxGap,
@@ -556,7 +551,7 @@ export function generatePdf(formData) {
       items: [
         { label: 'No-Show-Rate', value: '< 0,3 %' },
         {
-          label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
+          label: revenueLabel,
           value: `${formatCurrency(revenueWithAlenoBase)} ${currency}`
         },
         {
@@ -593,7 +588,7 @@ export function generatePdf(formData) {
   let tipsY = 105;
 
   const tipTitle = (n, t) => {
-    tipsY += 18; // ✅ gleichmäßiger Abstand für alle (inkl. 4.)
+    tipsY += 18;
     doc.fillColor(COLOR_DARK).font('Poppins-Bold').fontSize(18).text(`${n}. ${safeStr(t)}`, tipsX, tipsY);
     tipsY += 26;
   };
@@ -624,8 +619,6 @@ export function generatePdf(formData) {
   );
 
   const ctaW = 320;
-
-  // ✅ weiter nach unten, aber sicher auf Seite 4
   const ctaY = pageH - 88;
 
   drawCTAButton({
@@ -703,7 +696,11 @@ export function generatePdf(formData) {
     'Die L’Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern.'
   );
 
-  pinkBox(marginL + pinkW + pinkGap, '< 0,3% No-Shows', 'Das „Mural“ in München hat mit aleno No-Shows von 20% auf fast 0% reduziert.');
+  pinkBox(
+    marginL + pinkW + pinkGap,
+    '< 0,3% No-Shows',
+    'Das „Mural“ in München hat mit aleno No-Shows von 20% auf fast 0% reduziert.'
+  );
 
   pinkBox(
     marginL + (pinkW + pinkGap) * 2,
