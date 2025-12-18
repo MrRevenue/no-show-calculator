@@ -351,13 +351,21 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
       cy += rowH + rowGap;
     }
 
-    // Footer unten
+    // Footer unten (etwas höher + mehr Luft nach unten)
     if (footerNote) {
+      const footerBottomPadding = 18; // Abstand zum unteren Rand
+      const footerYOffset = 54;       // wie weit vom unteren Rand nach oben
+
       doc
         .fillColor(COLOR_WHITE)
         .font('Poppins-Light')
         .fontSize(footerFontSize)
-        .text(safeStr(footerNote), x + padX, y + h - 38, { width: innerW });
+        .text(
+          safeStr(footerNote),
+          x + padX,
+          y + h - footerYOffset,
+          { width: innerW }
+        );
     }
 
     doc.restore();
@@ -542,8 +550,8 @@ if (hasOtherTool) {
   const boxW = (contentW - boxGap) / 2;
 
   // ✅ deutlich kompakter
-  const headerY = afterIntroY + 8;
-  const boxY = headerY + 24;
+  const headerY = afterIntroY + 22;
+  const boxY = headerY + 26;
   const boxH = 300; // <— so bleibt Platz für den Hinweis
 
   // Überschriften
@@ -639,7 +647,7 @@ if (hasOtherTool) {
   let tipsY = 105;
 
   const tipTitle = (n, t) => {
-    tipsY += 14; // 👈 zusätzlicher Abstand vor der Überschrift
+    tipsY += 18; // 👈 zusätzlicher Abstand vor der Überschrift
 
     doc
       .fillColor(COLOR_BLACK)
@@ -687,136 +695,160 @@ if (hasOtherTool) {
     link: 'https://www.aleno.me/de/blog/no-show-restaurant'
   });
 
-  // =============================================================
-  // SEITE 5: Whitepaper-Stil + Demo-Button
-  // =============================================================
-  ensureNewPage();
 
-  // Dunkler Hintergrund
-  doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
 
-  // Titel
+
+// =============================================================
+// SEITE 5: Whitepaper-Stil + Demo-Button
+// =============================================================
+ensureNewPage();
+
+// Dunkler Hintergrund
+doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
+
+// (1) Titel wie auf den vorherigen Seiten (gleiche Größe)
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(28)
+  .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
+
+// (2) Mehr Abstand zwischen Titel und zweispaltigem Intro-Text
+const colGap = 30;
+const colW = (contentW - colGap) / 2;
+const colY = 155; // vorher 165 -> je nach vorherigem Layout; hier bewusst mehr Abstand nach Titel
+
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(14)
+  .text(
+    'Der Digitale Assistent aleno ist eine smarte All-in-One-Lösung für Gästekommunikation, Tischreservierungen und Betriebsoptimierung in der Gastronomie.',
+    marginL,
+    colY,
+    { width: colW }
+  );
+
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Light')
+  .fontSize(14)
+  .text(
+    'Die Software unterstützt dabei, Abläufe zu automatisisieren, Auslastung zu steigern und Gäste durch personalisierte Erlebnisse langfristig zu binden.',
+    marginL + colW + colGap,
+    colY,
+    { width: colW }
+  );
+
+// (3) Pinke KPI-Boxen etwas höher
+const pinkY = 245; // vorher 265 -> höher setzen
+const pinkGap = 18;
+const pinkW = (contentW - pinkGap * 2) / 3;
+const pinkH = 90;
+
+const pinkBox = (x, title, body) => {
+  doc.save();
+  doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
+
+  doc
+    .fillColor(COLOR_WHITE)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text(safeStr(title), x + 18, pinkY + 16, { width: pinkW - 36 });
+
   doc
     .fillColor(COLOR_WHITE)
     .font('Poppins-Light')
-    .fontSize(40)
-    .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
+    .fontSize(12)
+    .text(safeStr(body), x + 18, pinkY + 42, { width: pinkW - 36 });
 
-  // Zwei Spalten Intro-Text
-  const colGap = 30;
-  const colW = (contentW - colGap) / 2;
-  const colY = 165;
+  doc.restore();
+};
+
+pinkBox(
+  marginL,
+  '15% mehr Gäste',
+  "Die L’Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern."
+);
+
+// (4) Text ändern: <0,3% No-Shows
+pinkBox(
+  marginL + pinkW + pinkGap,
+  '<0,3% No-Shows',
+  'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.'
+);
+
+pinkBox(
+  marginL + (pinkW + pinkGap) * 2,
+  '5,2x ROI',
+  'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.'
+);
+
+// (5) Mehr Abstand zwischen Boxen und "Deine Vorteile ..."
+const vY = pinkY + pinkH + 55; // vorher ~385; jetzt dynamisch + mehr Luft
+doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Deine Vorteile mit aleno:', marginL, vY);
+
+let by = vY + 34;
+const benefits = [
+  'Spare mehrere Stunden Arbeit pro Woche durch Automatisierung',
+  'Nutze 360-Grad-Gästeprofile für gezieltes und erfolgreiches Upselling',
+  'Optimiere die Auslastung durch KI-gestützte Tischzuweisung',
+  'Reduziere No-Shows und erhalte verbindliche Buchungen',
+  'Behalte volle Kontrolle über deine Daten und deine Marke'
+];
+
+for (const b of safeArr(benefits)) {
+  drawCheckBullet({ x: marginL, y: by, text: b });
+  by += 26;
+}
+
+// Masterplan
+const mY = by + 22;
+doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
+
+let my = mY + 36;
+const master = [
+  { head: 'Buche eine kostenlose live Demo', text: 'Lerne die Möglichkeiten von aleno kennen.' },
+  { head: 'Erhalte eine individuelle Beratung', text: 'Entdecke, welche Optimierungspotenziale in deinem Restaurant oder Hotel aktiviert werden können.' },
+  { head: 'Starte direkt durch', text: 'Das aleno-Team richtet das System für dich ein.' }
+];
+
+for (const item of safeArr(master)) {
+  const head = safeStr(item?.head, '');
+  const text = safeStr(item?.text, '');
+
+  doc.fillColor(COLOR_PINK).font('Poppins-Bold').fontSize(14).text('•', marginL, my);
+
+  doc
+    .fillColor(COLOR_WHITE)
+    .font('Poppins-Bold')
+    .fontSize(14)
+    .text(`${head}:`, marginL + 16, my, { continued: true });
 
   doc
     .fillColor(COLOR_WHITE)
     .font('Poppins-Light')
     .fontSize(14)
-    .text(
-      'Der Digitale Assistent aleno ist eine smarte All-in-One-Lösung für Gästekommunikation, Tischreservierungen und Betriebsoptimierung in der Gastronomie.',
-      marginL,
-      colY,
-      { width: colW }
-    );
+    .text(` ${text}`, { width: contentW - 40 });
 
-  doc
-    .fillColor(COLOR_WHITE)
-    .font('Poppins-Light')
-    .fontSize(14)
-    .text(
-      'Die Software unterstützt dabei, Abläufe zu automatisisieren, Auslastung zu steigern und Gäste durch personalisierte Erlebnisse langfristig zu binden.',
-      marginL + colW + colGap,
-      colY,
-      { width: colW }
-    );
+  my += 26;
+}
 
-  // Drei pinke KPI-Kacheln
-  const pinkY = 265;
-  const pinkGap = 18;
-  const pinkW = (contentW - pinkGap * 2) / 3;
-  const pinkH = 90;
+// (6) CTA-Button unten rechts (auf derselben Seite)
+const ctaW = 260;
+const ctaH = 46;
+const ctaX = marginL + contentW - ctaW;
+const ctaY = pageH - 95;
 
-  const pinkBox = (x, title, body) => {
-    doc.save();
-    doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
+drawCTAButton({
+  x: ctaX,
+  y: ctaY,
+  w: ctaW,
+  h: ctaH,
+  text: 'Jetzt Demo buchen',
+  link: 'https://www.aleno.me/de/demo'
+});
 
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Bold')
-      .fontSize(18)
-      .text(safeStr(title), x + 18, pinkY + 16, { width: pinkW - 36 });
-
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Light')
-      .fontSize(12)
-      .text(safeStr(body), x + 18, pinkY + 42, { width: pinkW - 36 });
-
-    doc.restore();
-  };
-
-  pinkBox(marginL, '15% mehr Gäste', "Die L’Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern.");
-  pinkBox(marginL + pinkW + pinkGap, '< 0,5% No-Shows', 'Das Restaurant Mural in München hat mit aleno die No-Show-Rate von 20% auf 0% reduziert.');
-  pinkBox(marginL + (pinkW + pinkGap) * 2, '5,2x ROI', 'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.');
-
-  // Vorteile
-  const vY = 385;
-  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Deine Vorteile mit aleno:', marginL, vY);
-
-  let by = vY + 34;
-  const benefits = [
-    'Spare mehrere Stunden Arbeit pro Woche durch Automatisierung',
-    'Nutze 360-Grad-Gästeprofile für gezieltes und erfolgreiches Upselling',
-    'Optimiere die Auslastung durch KI-gestützte Tischzuweisung',
-    'Reduziere No-Shows und erhalte verbindliche Buchungen',
-    'Behalte volle Kontrolle über deine Daten und deine Marke'
-  ];
-
-  for (const b of safeArr(benefits)) {
-    drawCheckBullet({ x: marginL, y: by, text: b });
-    by += 26;
-  }
-
-  // Masterplan
-  const mY = by + 22;
-  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
-
-  let my = mY + 36;
-  const master = [
-    { head: 'Buche eine kostenlose live Demo', text: 'Lerne die Möglichkeiten von aleno kennen.' },
-    { head: 'Erhalte eine individuelle Beratung', text: 'Entdecke, welche Optimierungspotenziale in deinem Restaurant oder Hotel aktiviert werden können.' },
-    { head: 'Starte direkt durch', text: 'Das aleno-Team richtet das System für dich ein.' }
-  ];
-
-  for (const item of safeArr(master)) {
-    const head = safeStr(item?.head, '');
-    const text = safeStr(item?.text, '');
-
-    doc.fillColor(COLOR_PINK).font('Poppins-Bold').fontSize(14).text('•', marginL, my);
-
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Bold')
-      .fontSize(14)
-      .text(`${head}:`, marginL + 16, my, { continued: true });
-
-    doc
-      .fillColor(COLOR_WHITE)
-      .font('Poppins-Light')
-      .fontSize(14)
-      .text(` ${text}`, { width: contentW - 40 });
-
-    my += 26;
-  }
-
-  // CTA Button
-  drawCTAButton({
-    x: marginL,
-    y: pageH - 95,
-    w: 320,
-    h: 46,
-    text: 'Kostenlose Demo buchen',
-    link: 'https://www.aleno.me/de/demo'
-  });
 
   // Ende: IMPORTANT – hier endet das Dokument, aber es wird NICHT gepiped (das macht send-report.js)
   return doc;
