@@ -48,7 +48,6 @@ export function generatePdf(formData) {
   const COLOR_DARK = '#282731';
   const COLOR_PINK = '#ff2e92';
   const COLOR_WHITE = '#ffffff';
-
   const COLOR_GRAY = '#4b5563';
   const COLOR_SUB = '#d1d5db';
 
@@ -112,20 +111,24 @@ export function generatePdf(formData) {
   // ------------------ Assets (/public) ------------------
   const LOGO_IMAGE = path.join(process.cwd(), 'public', 'aleno-new_negativ.png');
 
+  // ✅ Neues Cover-Bild (bitte Datei so in /public ablegen)
+  const COVER_IMAGE = path.join(process.cwd(), 'public', 'cover-photo.jpg');
+
   // =============================================================
-  // SEITE 1: TITELSEITE (Full Bleed)
+  // SEITE 1: TITELSEITE (Full Bleed) – neues Bild, abgerundet, zentriert
   // =============================================================
   const coverW = doc.page.width;
   const coverH = doc.page.height;
 
-  const TITLE_IMAGE = path.join(process.cwd(), 'public', 'titelbild.png');
-
+  // Hintergrund
   doc.rect(0, 0, coverW, coverH).fill(COLOR_DARK);
 
+  // aleno Logo links oben
   if (fs.existsSync(LOGO_IMAGE)) {
     doc.image(LOGO_IMAGE, 55, 45, { width: 150 });
   }
 
+  // ---- Helper: Text automatisch verkleinern, bis er reinpasst
   const fitText = ({
     text,
     x,
@@ -153,9 +156,30 @@ export function generatePdf(formData) {
     return size;
   };
 
+  // ---- Cover-Bild rechts (abgerundet + zentriert)
+  const rightPad = 45;
+  const gapToTitle = 36;
+  const imgBoxW = coverW * 0.40;
+  const imgBoxH = coverH * 0.68;
+  const imgBoxX = coverW - rightPad - imgBoxW;
+  const imgBoxY = Math.round((coverH - imgBoxH) / 2);
+  const imgRadius = 16;
+
+  if (fs.existsSync(COVER_IMAGE)) {
+    doc.save();
+    doc.roundedRect(imgBoxX, imgBoxY, imgBoxW, imgBoxH, imgRadius).clip();
+    doc.image(COVER_IMAGE, imgBoxX, imgBoxY, {
+      cover: [imgBoxW, imgBoxH],
+      align: 'center',
+      valign: 'center'
+    });
+    doc.restore();
+  }
+
+  // ---- Titel-Layout (links) – wie vorher, aber Breite dynamisch bis vor das Bild
   const titleX = 55;
   const titleY = 220;
-  const titleW = coverW * 0.58;
+  const titleW = Math.max(240, imgBoxX - gapToTitle - titleX);
   const titleMaxH = 260;
 
   const titleText = `No-Show-Report\nfür das Restaurant\n„${restaurantName}“`;
@@ -173,24 +197,12 @@ export function generatePdf(formData) {
     color: COLOR_WHITE
   });
 
+  // Untertitel
   doc
     .fillColor(COLOR_SUB)
     .font('Poppins-Light')
     .fontSize(26)
     .text('Zahlen, Vergleiche, Tipps', titleX, coverH - 120, { width: titleW });
-
-  if (fs.existsSync(TITLE_IMAGE)) {
-    const imgBoxX = coverW * 0.58;
-    const imgBoxY = 0;
-    const imgBoxW = coverW * 0.42;
-    const imgBoxH = coverH * 0.72;
-
-    doc.image(TITLE_IMAGE, imgBoxX, imgBoxY, {
-      cover: [imgBoxW, imgBoxH],
-      align: 'right',
-      valign: 'top'
-    });
-  }
 
   // =============================================================
   // Ab Seite 2: Content Seiten mit Margin 50
@@ -275,14 +287,22 @@ export function generatePdf(formData) {
     const valueColW = 150;
     const labelColW = innerW - valueColW;
 
-    const footerFontSize = 11;
+    // ✅ Footer: Größe + Gewicht leicht erhöht, Höhe dynamisch (kein Abschneiden)
+    const footerFontSize = bg === COLOR_PINK ? 12 : 11; // etwas größer in pink
+    const footerFontName = bg === COLOR_PINK ? 'Poppins-SemiBold' : 'Poppins-Light'; // minimal fetter in pink
     const footerLineGap = 2;
-    const footerLinesReserve = footerNote ? 3 : 0;
-    const footerH = footerNote ? Math.max(74, footerLinesReserve * (footerFontSize + footerLineGap) + 18) : 0;
+
+    let footerH = 0;
+    if (footerNote) {
+      doc.font(footerFontName).fontSize(footerFontSize);
+      const needed = doc.heightOfString(safeStr(footerNote), { width: innerW, lineGap: footerLineGap });
+      footerH = Math.min(110, Math.ceil(needed + 16)); // Cap als Safety
+    }
     const footerY = y + h - footerH;
 
     let cy = y + padTop;
 
+    // Labels (Item-Texte): etwas größer + SemiBold (wie zuletzt)
     const labelSizeDefault = 15;
     const valueSizeDefault = 16;
     const rowGap = 10;
@@ -319,7 +339,7 @@ export function generatePdf(formData) {
         .fontSize(valueSize)
         .text(value, valueBoxX, cy, { width: valueColW, align: 'right' });
 
-      // Pinselstrich dicker (für underlineValue)
+      // ✅ Pinselstrich in pink noch etwas dicker
       if (it?.underlineValue && typeof BRUSH_WHITE !== 'undefined' && fs.existsSync(BRUSH_WHITE)) {
         doc.font('Poppins-Bold').fontSize(valueSize);
         const textW = doc.widthOfString(value);
@@ -328,7 +348,7 @@ export function generatePdf(formData) {
         const x1 = x2 - textW;
 
         const imgY = cy + valueSize + 2;
-        const imgH = 22;
+        const imgH = 24; // dicker
 
         doc.save();
         doc.opacity(0.98);
@@ -339,14 +359,15 @@ export function generatePdf(formData) {
       cy += rowH + rowGap;
     }
 
+    // Footer
     if (footerNote) {
       doc
         .fillColor(COLOR_WHITE)
-        .font('Poppins-Light')
+        .font(footerFontName)
         .fontSize(footerFontSize)
         .text(safeStr(footerNote), x + padX, footerY + 8, {
           width: innerW,
-          height: footerH - 16,
+          height: Math.max(0, footerH - 16),
           lineGap: footerLineGap
         });
     }
@@ -505,9 +526,6 @@ export function generatePdf(formData) {
     } else if (usesAleno) {
       leftTitle = 'aleno mit deinem Setup:';
       rightTitle = 'aleno für dich angepasst:';
-    } else if (hasOtherTool) {
-      leftTitle = 'Mit bestehender Software:';
-      rightTitle = 'Mit aleno:';
     }
 
     doc.fillColor(COLOR_DARK).font('Poppins-Bold').fontSize(18).text(leftTitle, marginL, headerY, { width: boxW });
@@ -517,7 +535,7 @@ export function generatePdf(formData) {
       .fontSize(18)
       .text(rightTitle, marginL + boxW + boxGap, headerY, { width: boxW });
 
-    // ✅ kürzerer Label-Text (passt besser mit SemiBold)
+    // ✅ Kürzerer Label-Text (wie gewünscht)
     const revenueLabel = 'Reservierungs-Umsatz (30 Tage)';
 
     drawBigCompareTile({
@@ -528,10 +546,7 @@ export function generatePdf(formData) {
       bg: COLOR_DARK,
       items: [
         { label: 'No-Show-Rate', value: `${noShowRate.toFixed(1)} %` },
-        {
-          label: revenueLabel,
-          value: `${formatCurrency(revenueActual30)} ${currency}`
-        },
+        { label: revenueLabel, value: `${formatCurrency(revenueActual30)} ${currency}` },
         { label: 'Zusätzliches Umsatzpotenzial', value: '—' },
         { label: 'Zeitersparnis', value: '0 Stunden' }
       ]
@@ -550,10 +565,7 @@ export function generatePdf(formData) {
       bg: COLOR_PINK,
       items: [
         { label: 'No-Show-Rate', value: '< 0,3 %' },
-        {
-          label: revenueLabel,
-          value: `${formatCurrency(revenueWithAlenoBase)} ${currency}`
-        },
+        { label: revenueLabel, value: `${formatCurrency(revenueWithAlenoBase)} ${currency}` },
         {
           label: 'Zusätzliches Umsatzpotenzial',
           value: `${formatCurrency(extraUpside15)} ${currency}`,
@@ -593,9 +605,16 @@ export function generatePdf(formData) {
     tipsY += 26;
   };
 
+  // ✅ Body-Höhe dynamisch -> verhindert, dass "4. Warteliste" zu nah kommt
   const tipBody = (txt) => {
-    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14).text(safeStr(txt), tipsX, tipsY, { width: contentW });
-    tipsY += 54;
+    const text = safeStr(txt);
+
+    doc.fillColor(COLOR_GRAY).font('Poppins-Light').fontSize(14);
+    const h = doc.heightOfString(text, { width: contentW, lineGap: 3 });
+
+    doc.text(text, tipsX, tipsY, { width: contentW, lineGap: 3 });
+
+    tipsY += h + 22; // Abstand nach Text
   };
 
   tipTitle(1, 'Autom. Erinnerung');
@@ -744,5 +763,6 @@ export function generatePdf(formData) {
     link: 'https://www.aleno.me/de/demo?utm_source=no-show-calculator-report&utm_medium=pdf&utm_campaign=lead-no-show&utm_content=book-demo'
   });
 
+  // Ende: doc wird NICHT gepiped (das macht send-report.js)
   return doc;
 }
