@@ -698,33 +698,30 @@ if (hasOtherTool) {
 
   
 // =============================================================
-// SEITE 5: Whitepaper-Stil + Demo-Button (stabil: kein Autopaging)
+// SEITE 5: Whitepaper-Stil + Demo-Button (ohne Masterplan)
 // =============================================================
 ensureNewPage();
 
 // Dunkler Hintergrund
 doc.rect(0, 0, pageW, pageH).fill(COLOR_DARK);
 
-// --- Layout-Konstanten
+// CTA unten rechts – eindeutige Variablen
 const ctaW5 = 260;
 const ctaH5 = 46;
 const ctaX5 = marginL + contentW - ctaW5;
 const ctaY5 = pageH - 95;
 
-// Alles auf dieser Seite muss oberhalb hiervon bleiben (sonst Autopaging)
-const safeBottomY = ctaY5 - 20;
-
-// (1) Titel wie vorherige Seiten (Größe 28)
+// (1) Titel wie auf vorherigen Seiten (Größe 28)
 doc
   .fillColor(COLOR_WHITE)
   .font('Poppins-Light')
   .fontSize(28)
   .text('Mit aleno Aufwand reduzieren\nund Umsatz steigern', marginL, 55, { width: contentW });
 
-// (2) Mehr Abstand Titel -> zweispaltiges Intro
+// (2) Mehr Abstand zwischen Titel und zweispaltigem Intro
 const colGap = 30;
 const colW = (contentW - colGap) / 2;
-const colY = 170; // mehr Abstand zum Titel als vorher
+const colY = 170;
 
 doc
   .fillColor(COLOR_WHITE)
@@ -748,8 +745,8 @@ doc
     { width: colW }
   );
 
-// (3) Pinke KPI-Boxen deutlich höher
-const pinkY = 245; // höher als zuvor (war bei dir optisch noch zu tief)
+// (3) Pinke KPI-Boxen höher platzieren
+const pinkY = 245;
 const pinkGap = 18;
 const pinkW = (contentW - pinkGap * 2) / 3;
 const pinkH = 90;
@@ -779,7 +776,7 @@ drawPinkBox(
   "Die L'Osteria konnte mit aleno in über 200 Betrieben Auslastung und Umsatz deutlich steigern."
 );
 
-// (4) <0,5% -> <0,3%
+// (4) <0,3% No-Shows
 drawPinkBox(
   marginL + pinkW + pinkGap,
   '<0,3% No-Shows',
@@ -793,11 +790,16 @@ drawPinkBox(
 );
 
 // (5) Mehr Abstand zwischen Boxen und "Deine Vorteile ..."
-const vY = pinkY + pinkH + 50;
-doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Deine Vorteile mit aleno:', marginL, vY);
+const vY = pinkY + pinkH + 55;
 
-// Vorteile (kompakter, damit sicher alles auf Seite 5 bleibt)
-let by = vY + 32;
+doc
+  .fillColor(COLOR_WHITE)
+  .font('Poppins-Bold')
+  .fontSize(20)
+  .text('Deine Vorteile mit aleno:', marginL, vY);
+
+// Vorteile (genau deine 5 Punkte)
+let by = vY + 34;
 const benefits = [
   'Spare mehrere Stunden Arbeit pro Woche durch Automatisierung',
   'Nutze 360-Grad-Gästeprofile für gezieltes und erfolgreiches Upselling',
@@ -807,36 +809,11 @@ const benefits = [
 ];
 
 for (const b of safeArr(benefits)) {
-  // Sicherheit: nicht über safeBottomY laufen
-  if (by > safeBottomY - 110) break;
   drawCheckBullet({ x: marginL, y: by, text: b });
-  by += 24; // etwas enger als vorher (war 26)
+  by += 26;
 }
 
-// Masterplan – als BOX (kein Autopaging mehr!)
-const mY = by + 14;
-doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(20).text('Dein Masterplan zu mehr Erfolg:', marginL, mY);
-
-const masterText =
-  '• Buche eine kostenlose Live-Demo – Lerne die Möglichkeiten von aleno kennen.\n' +
-  '• Erhalte eine individuelle Beratung – Entdecke Optimierungspotenziale für dein Restaurant oder Hotel.\n' +
-  '• Starte direkt durch – Das aleno-Team richtet das System für dich ein.';
-
-const masterBoxY = mY + 30;
-const masterBoxH = Math.max(40, safeBottomY - masterBoxY - 10); // füllt den Raum bis über den CTA
-
-doc
-  .fillColor(COLOR_WHITE)
-  .font('Poppins-Light')
-  .fontSize(13)
-  .text(masterText, marginL, masterBoxY, {
-    width: contentW,
-    height: masterBoxH,     // <-- verhindert neue Seiten
-    lineGap: 3,
-    ellipsis: true
-  });
-
-// (6) CTA unten rechts AUF SEITE 5
+// (6) CTA unten rechts auf derselben Seite
 drawCTAButton({
   x: ctaX5,
   y: ctaY5,
@@ -845,6 +822,7 @@ drawCTAButton({
   text: 'Jetzt Demo buchen',
   link: 'https://www.aleno.me/de/demo'
 });
+
 
 
 
