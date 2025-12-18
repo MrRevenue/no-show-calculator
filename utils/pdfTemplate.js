@@ -344,47 +344,53 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
         .fontSize(labelSize)
         .text(label, x + padX, cy, { width: labelColW });
 
-      // Value
+      // Value (rechtsbündig)
+      const valueBoxX = x + padX + labelColW;
+
       doc
         .fillColor(valueColor)
         .font('Poppins-Bold')
         .fontSize(valueSize)
-        .text(value, x + padX + labelColW, cy, {
-          width: valueColW,
-          align: 'right'
-        });
+        .text(value, valueBoxX, cy, { width: valueColW, align: 'right' });
 
-      // ---------------- Brush-Underline ----------------
-      if (it?.underlineValue) {
+      // ✅ Brush-Underline: PNG (kein stroke mehr!)
+      if (it?.underlineValue && typeof BRUSH_WHITE !== 'undefined' && fs.existsSync(BRUSH_WHITE)) {
+        doc.font('Poppins-Bold').fontSize(valueSize);
         const textW = doc.widthOfString(value);
-        const valueBoxX = x + padX + labelColW;
+
         const x2 = valueBoxX + valueColW;
         const x1 = x2 - textW;
-        const baseY = cy + valueSize + 8;
+
+        // Unter dem Text
+        const imgY = cy + valueSize + 3;
+
+        // etwas weniger kräftig als dein Beispiel
+        const imgH = 14;
 
         doc.save();
-        doc.strokeColor(COLOR_WHITE).lineCap('round');
-
-        doc
-          .lineWidth(5)
-          .opacity(0.9)
-          .moveTo(x1, baseY)
-          .bezierCurveTo(
-            x1 + textW * 0.25, baseY + 3,
-            x1 + textW * 0.55, baseY - 2,
-            x2, baseY + 1
-          )
-          .stroke();
-
-        doc
-          .lineWidth(3)
-          .opacity(0.6)
-          .moveTo(x1 + 6, baseY + 4)
-          .lineTo(x2 - 8, baseY + 4)
-          .stroke();
-
+        doc.opacity(0.95);
+        doc.image(BRUSH_WHITE, x1, imgY, { width: textW, height: imgH });
         doc.restore();
       }
+
+      cy += rowH + rowGap;
+    }
+
+    // Footer
+    if (footerNote) {
+      doc
+        .fillColor(COLOR_WHITE)
+        .font('Poppins-Light')
+        .fontSize(footerFontSize)
+        .text(safeStr(footerNote), x + padX, footerY + 8, {
+          width: innerW,
+          lineGap: 2
+        });
+    }
+
+    doc.restore();
+  };
+
 
       // 🔑 DAS HAT GEFEHLT
       cy += rowH + rowGap;
@@ -732,7 +738,7 @@ if (hasOtherTool) {
 
   
 // =============================================================
-// SEITE 5: Whitepaper-Stil + Demo-CTA (FINAL STABIL)
+// SEITE 5: Whitepaper-Stil + Demo-CTA (FINAL STABIL + Rounded Boxes)
 // =============================================================
 ensureNewPage();
 
@@ -773,15 +779,18 @@ doc
     { width: colW }
   );
 
-// ------------------ Pinke KPI-Boxen ------------------
-const pinkY = introY + 80;   // kompakter
+// ------------------ Pinke KPI-Boxen (Rounded) ------------------
+const pinkY = introY + 80; // kompakt
 const pinkGap = 18;
 const pinkW = (contentW - pinkGap * 2) / 3;
 const pinkH = 110;
+const pinkR = 14; // 👈 Radius wie bei anderen Kacheln
 
 const pinkBox = (x, title, body) => {
   doc.save();
-  doc.rect(x, pinkY, pinkW, pinkH).fill(COLOR_PINK);
+
+  // Rounded Box statt rect
+  doc.roundedRect(x, pinkY, pinkW, pinkH, pinkR).fill(COLOR_PINK);
 
   doc
     .fillColor(COLOR_WHITE)
@@ -793,7 +802,7 @@ const pinkBox = (x, title, body) => {
     .fillColor(COLOR_WHITE)
     .font('Poppins-Light')
     .fontSize(12)
-    .text(body, x + 18, pinkY + 44, { width: pinkW - 36 });
+    .text(body, x + 18, pinkY + 44, { width: pinkW - 36, lineGap: 2 });
 
   doc.restore();
 };
@@ -837,7 +846,9 @@ let bY = vY + 32;
 
 for (const text of benefits) {
   // Bullet
-doc.fillColor(COLOR_PINK).circle(marginL + 6, bY + 8, 5).fill();
+  doc.save();
+  doc.fillColor(COLOR_PINK).circle(marginL + 6, bY + 8, 5).fill();
+  doc.restore();
 
   // Text
   doc
@@ -853,6 +864,7 @@ doc.fillColor(COLOR_PINK).circle(marginL + 6, bY + 8, 5).fill();
 const ctaW5 = 260;
 const ctaH5 = 46;
 
+// fix position (nicht abhängig von Cursor)
 drawCTAButton({
   x: pageW - marginR - ctaW5,
   y: pageH - 85,
@@ -861,6 +873,7 @@ drawCTAButton({
   text: 'Jetzt Demo buchen',
   link: 'https://www.aleno.me/de/demo'
 });
+
 
 
 
