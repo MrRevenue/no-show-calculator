@@ -294,124 +294,124 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
   doc.restore();
 };
 
-  const drawBigCompareTile = ({ x, y, w, h, bg, items, footerNote }) => {
-    doc.save();
-    doc.roundedRect(x, y, w, h, 16).fill(bg);
+const drawBigCompareTile = ({ x, y, w, h, bg, items, footerNote }) => {
+  doc.save();
 
-    const padX = 26;
-    const padTop = 26;
-    const padBottom = 18;
+  // Background
+  doc.roundedRect(x, y, w, h, 16).fill(bg);
 
-    const innerW = w - padX * 2;
+  const padX = 26;
+  const padTop = 26;
+  const padBottom = 18;
 
-    // 2-Spalten-Layout
-    const valueColW = 150;
-    const labelColW = innerW - valueColW;
+  const innerW = w - padX * 2;
 
-    // Footer
-    const footerFontSize = 9;
-    const footerH = footerNote ? 44 : 0;
-    const footerY = y + h - footerH;
+  // 2-Spalten-Layout
+  const valueColW = 150;
+  const labelColW = innerW - valueColW;
 
-    let cy = y + padTop;
+  // Footer
+  const footerFontSize = 9;
+  const footerH = footerNote ? 44 : 0;
+  const footerY = y + h - footerH;
 
-    const labelSizeDefault = 14;
-    const valueSizeDefault = 16;
-    const rowGap = 10;
+  let cy = y + padTop;
 
-    for (const it of safeArr(items)) {
-      const label = safeStr(it?.label);
-      const value = safeStr(it?.value);
+  const labelSizeDefault = 14;
+  const valueSizeDefault = 16;
+  const rowGap = 10;
 
-      const labelSize = Number.isFinite(it?.labelSize) ? it.labelSize : labelSizeDefault;
-      const valueSize = Number.isFinite(it?.valueSize) ? it.valueSize : valueSizeDefault;
-      const valueColor = it?.valueColor || COLOR_WHITE;
+  for (const it of safeArr(items)) {
+    const label = safeStr(it?.label);
+    const value = safeStr(it?.value);
 
-      doc.font('Poppins-Light').fontSize(labelSize);
-      const labelH = doc.heightOfString(label, { width: labelColW });
+    const labelSize = Number.isFinite(it?.labelSize)
+      ? it.labelSize
+      : labelSizeDefault;
 
+    const valueSize = Number.isFinite(it?.valueSize)
+      ? it.valueSize
+      : valueSizeDefault;
+
+    const valueColor = it?.valueColor || COLOR_WHITE;
+
+    // Höhen berechnen
+    doc.font('Poppins-Light').fontSize(labelSize);
+    const labelH = doc.heightOfString(label, { width: labelColW });
+
+    doc.font('Poppins-Bold').fontSize(valueSize);
+    const valueH = doc.heightOfString(value, { width: valueColW });
+
+    const rowH = Math.max(labelH, valueH);
+
+    // Abbruch, wenn Footer erreicht wird
+    if (cy + rowH > footerY - padBottom) break;
+
+    // Label
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Light')
+      .fontSize(labelSize)
+      .text(label, x + padX, cy, { width: labelColW });
+
+    // Value (rechtsbündig)
+    const valueBoxX = x + padX + labelColW;
+
+    doc
+      .fillColor(valueColor)
+      .font('Poppins-Bold')
+      .fontSize(valueSize)
+      .text(value, valueBoxX, cy, {
+        width: valueColW,
+        align: 'right'
+      });
+
+    // Brush-Underline (optional)
+    if (
+      it?.underlineValue &&
+      typeof BRUSH_WHITE !== 'undefined' &&
+      fs.existsSync(BRUSH_WHITE)
+    ) {
       doc.font('Poppins-Bold').fontSize(valueSize);
-      const valueH = doc.heightOfString(value, { width: valueColW });
+      const textW = doc.widthOfString(value);
 
-      const rowH = Math.max(labelH, valueH);
+      const x2 = valueBoxX + valueColW;
+      const x1 = x2 - textW;
+      const imgY = cy + valueSize + 3;
+      const imgH = 14;
 
-      if (cy + rowH > footerY - padBottom) break;
-
-      // Label
-      doc
-        .fillColor(COLOR_WHITE)
-        .font('Poppins-Light')
-        .fontSize(labelSize)
-        .text(label, x + padX, cy, { width: labelColW });
-
-      // Value (rechtsbündig)
-      const valueBoxX = x + padX + labelColW;
-
-      doc
-        .fillColor(valueColor)
-        .font('Poppins-Bold')
-        .fontSize(valueSize)
-        .text(value, valueBoxX, cy, { width: valueColW, align: 'right' });
-
-      // ✅ Brush-Underline: PNG (kein stroke mehr!)
-      if (it?.underlineValue && typeof BRUSH_WHITE !== 'undefined' && fs.existsSync(BRUSH_WHITE)) {
-        doc.font('Poppins-Bold').fontSize(valueSize);
-        const textW = doc.widthOfString(value);
-
-        const x2 = valueBoxX + valueColW;
-        const x1 = x2 - textW;
-
-        // Unter dem Text
-        const imgY = cy + valueSize + 3;
-
-        // etwas weniger kräftig als dein Beispiel
-        const imgH = 14;
-
-        doc.save();
-        doc.opacity(0.95);
-        doc.image(BRUSH_WHITE, x1, imgY, { width: textW, height: imgH });
-        doc.restore();
-      }
-
-      cy += rowH + rowGap;
+      doc.save();
+      doc.opacity(0.95);
+      doc.image(BRUSH_WHITE, x1, imgY, {
+        width: textW,
+        height: imgH
+      });
+      doc.restore();
     }
 
-    // Footer
-    if (footerNote) {
-      doc
-        .fillColor(COLOR_WHITE)
-        .font('Poppins-Light')
-        .fontSize(footerFontSize)
-        .text(safeStr(footerNote), x + padX, footerY + 8, {
+    cy += rowH + rowGap;
+  }
+
+  // Footer
+  if (footerNote) {
+    doc
+      .fillColor(COLOR_WHITE)
+      .font('Poppins-Light')
+      .fontSize(footerFontSize)
+      .text(
+        safeStr(footerNote),
+        x + padX,
+        footerY + 8,
+        {
           width: innerW,
           lineGap: 2
-        });
-    }
+        }
+      );
+  }
 
-    doc.restore();
-  };
+  doc.restore();
+};
 
-
-      // 🔑 DAS HAT GEFEHLT
-      cy += rowH + rowGap;
-    }
-
-    // Footer
-    if (footerNote) {
-      doc
-        .fillColor(COLOR_WHITE)
-        .font('Poppins-Light')
-        .fontSize(footerFontSize)
-        .text(
-          safeStr(footerNote),
-          x + padX,
-          footerY + 8,
-          { width: innerW }
-        );
-    }
-
-    doc.restore();
-  };
 
 
 
