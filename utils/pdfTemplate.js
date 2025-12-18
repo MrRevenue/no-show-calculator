@@ -700,7 +700,7 @@ if (hasOtherTool) {
 
   
 // =============================================================
-// SEITE 5: Whitepaper-Stil + Demo-CTA (FINAL)
+// SEITE 5: Whitepaper-Stil + Demo-CTA (FINAL STABIL)
 // =============================================================
 ensureNewPage();
 
@@ -712,17 +712,12 @@ doc
   .fillColor(COLOR_WHITE)
   .font('Poppins-Light')
   .fontSize(40)
-  .text(
-    'Mit aleno erfolgreicher werden',
-    marginL,
-    55,
-    { width: contentW }
-  );
+  .text('Mit aleno erfolgreicher werden', marginL, 55, { width: contentW });
 
-// ------------------ Intro (2 Spalten, gekürzt) ------------------
+// ------------------ Intro (2 Spalten) ------------------
 const colGap = 30;
 const colW = (contentW - colGap) / 2;
-const introY = 165;
+const introY = 155;
 
 doc
   .fillColor(COLOR_WHITE)
@@ -747,10 +742,10 @@ doc
   );
 
 // ------------------ Pinke KPI-Boxen ------------------
-const pinkY = introY + 90;        // ⬅ mehr Abstand nach Intro
+const pinkY = introY + 80;   // kompakter
 const pinkGap = 18;
 const pinkW = (contentW - pinkGap * 2) / 3;
-const pinkH = 115;                // ⬅ bewusst höher
+const pinkH = 110;
 
 const pinkBox = (x, title, body) => {
   doc.save();
@@ -760,13 +755,13 @@ const pinkBox = (x, title, body) => {
     .fillColor(COLOR_WHITE)
     .font('Poppins-Bold')
     .fontSize(18)
-    .text(title, x + 18, pinkY + 18, { width: pinkW - 36 });
+    .text(title, x + 18, pinkY + 16, { width: pinkW - 36 });
 
   doc
     .fillColor(COLOR_WHITE)
     .font('Poppins-Light')
     .fontSize(12)
-    .text(body, x + 18, pinkY + 48, { width: pinkW - 36 });
+    .text(body, x + 18, pinkY + 44, { width: pinkW - 36 });
 
   doc.restore();
 };
@@ -789,8 +784,8 @@ pinkBox(
   'Für das Restaurant Zur Taube in Zug zahlt sich der Einsatz von aleno um ein Vielfaches aus.'
 );
 
-// ------------------ Vorteile ------------------
-const vY = pinkY + pinkH + 40;
+// ------------------ Vorteile (OHNE Cursor-Drift) ------------------
+const vY = pinkY + pinkH + 32;
 
 doc
   .fillColor(COLOR_WHITE)
@@ -798,7 +793,6 @@ doc
   .fontSize(20)
   .text('Deine Vorteile mit aleno:', marginL, vY);
 
-let by = vY + 34;
 const benefits = [
   'Spare mehrere Stunden Arbeit pro Woche durch Automatisierung',
   'Nutze 360-Grad-Gästeprofile für gezieltes und erfolgreiches Upselling',
@@ -807,23 +801,36 @@ const benefits = [
   'Behalte volle Kontrolle über deine Daten und deine Marke'
 ];
 
-for (const b of benefits) {
-  drawCheckBullet({ x: marginL, y: by, text: b });
-  by += 26;
+let bY = vY + 32;
+
+for (const text of benefits) {
+  // Bullet
+  doc.fillColor(COLOR_PINK).circle(marginL + 6, bY + 7, 6).fill();
+  doc.fillColor(COLOR_WHITE).font('Poppins-Bold').fontSize(10).text('✓', marginL + 3, bY + 1);
+
+  // Text
+  doc
+    .fillColor(COLOR_WHITE)
+    .font('Poppins-Light')
+    .fontSize(13)
+    .text(text, marginL + 20, bY, { width: contentW - 40 });
+
+  bY += 24; // bewusst kleiner
 }
 
-// ------------------ CTA unten rechts (fix auf Seite 5) ------------------
+// ------------------ CTA unten rechts ------------------
 const ctaW5 = 260;
 const ctaH5 = 46;
 
 drawCTAButton({
   x: pageW - marginR - ctaW5,
-  y: pageH - 90,
+  y: pageH - 85,
   w: ctaW5,
   h: ctaH5,
   text: 'Jetzt Demo buchen',
   link: 'https://www.aleno.me/de/demo'
 });
+
 
 
 
