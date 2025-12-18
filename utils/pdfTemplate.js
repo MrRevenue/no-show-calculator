@@ -549,11 +549,11 @@ if (hasOtherTool) {
   const boxGap = 26;
   const boxW = (contentW - boxGap) / 2;
 
-  // etwas mehr Abstand zwischen Intro und Überschriften
+  // Abstand zwischen Intro und Überschriften
   const headerY = afterIntroY + 22;
   const boxY = headerY + 26;
 
-  // Kachelhöhe (bei dir ggf. schon passend)
+  // Kachelhöhe
   const boxH = 290;
 
   // Überschriften über den Kacheln
@@ -569,7 +569,7 @@ if (hasOtherTool) {
     .fontSize(18)
     .text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
 
-  // Linke Kachel – bestehende Software (on top: ---)
+  // Linke Kachel – bestehende Software (Zusätzliches Umsatzpotenzial: —)
   drawBigCompareTile({
     x: marginL,
     y: boxY,
@@ -583,14 +583,14 @@ if (hasOtherTool) {
         value: `${formatCurrency(revenueActual30)} ${currency}`
       },
       {
-        label: 'Zusätzliches Umsatzpotenzial on top',
+        label: 'Zusätzliches Umsatzpotenzial',
         value: '—'
       },
       { label: 'Zeitersparnis', value: '0 Stunden' }
     ]
   });
 
-  // Rechte Kachel – aleno (on top: extraUpside15 + Brush-Underline)
+  // Rechte Kachel – aleno (Zusätzliches Umsatzpotenzial: extraUpside15 + Brush-Underline)
   drawBigCompareTile({
     x: marginL + boxW + boxGap,
     y: boxY,
@@ -604,7 +604,7 @@ if (hasOtherTool) {
         value: `${formatCurrency(revenueWithAlenoBase)} ${currency}`
       },
       {
-        label: 'Zusätzliches Umsatzpotenzial on top',
+        label: 'Zusätzliches Umsatzpotenzial',
         value: `${formatCurrency(extraUpside15)} ${currency}`,
         valueSize: 18,
         underlineValue: true
