@@ -229,7 +229,7 @@ if (fs.existsSync(TITLE_IMAGE)) {
   const contentW = pageW - marginL - marginR;
 
   // ------------------ Layout Helpers ------------------
-  const drawKpiTile = ({ x, y, w, h, title, value, bg = COLOR_BLACK, fg = COLOR_WHITE }) => {
+  const drawKpiTile = ({ x, y, w, h, title, value, bg = COLOR_DARK, fg = COLOR_WHITE }) => {
     doc.save();
     doc.roundedRect(x, y, w, h, 14).fill(bg);
 
@@ -250,11 +250,11 @@ if (fs.existsSync(TITLE_IMAGE)) {
 
 const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
   doc.save();
-  doc.roundedRect(x, y, w, h, 14).lineWidth(2).stroke(COLOR_BLACK);
+  doc.roundedRect(x, y, w, h, 14).lineWidth(2).stroke(COLOR_DARK);
 
   // Titel
   doc
-    .fillColor(COLOR_BLACK)
+    .fillColor(COLOR_DARK)
     .font('Poppins-Bold')
     .fontSize(18)
     .text(safeStr(title), x + 22, y + 20, { width: w - 44, align: 'left' });
@@ -305,7 +305,7 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     const innerW = w - padX * 2;
 
     // 2-Spalten-Layout
-    const valueColW = 150;                 // Wert-Spalte rechts (fix, stabil)
+    const valueColW = 150;                 // Wert-Spalte rechts (fix)
     const labelColW = innerW - valueColW;  // Label links (wrapt sauber)
 
     // Footer reservieren (falls vorhanden)
@@ -318,7 +318,7 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     // Typo Defaults
     const labelSizeDefault = 14;
     const valueSizeDefault = 16;
-    const rowGap = 10; // sichtbarer Abstand zwischen Rows
+    const rowGap = 10;
 
     for (const it of safeArr(items)) {
       const label = safeStr(it?.label);
@@ -348,62 +348,48 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
         .text(label, x + padX, cy, { width: labelColW });
 
       // Value rechts (rechtsbündig)
+      const valueBoxX = x + padX + labelColW;
+
       doc
         .fillColor(valueColor)
         .font('Poppins-Bold')
         .fontSize(valueSize)
-        .text(value, x + padX + labelColW, cy, { width: valueColW, align: 'right' });
+        .text(value, valueBoxX, cy, { width: valueColW, align: 'right' });
 
-
-      // ✅ Brush-Underline (optional) – NACH dem Value zeichnen!
-      if (it?.underlineValue) {
+      // ✅ Brush-Underline NUR als PNG (kein alter Stroke-Code mehr)
+      if (it?.underlineValue && typeof BRUSH_WHITE !== 'undefined' && fs.existsSync(BRUSH_WHITE)) {
         doc.font('Poppins-Bold').fontSize(valueSize);
         const textW = doc.widthOfString(value);
 
-        const valueBoxX = x + padX + labelColW;
-        const x2 = valueBoxX + valueColW;
+        const x2 = valueBoxX + valueColW; // rechte Kante der Value-Spalte
         const x1 = x2 - textW;
 
-        const baseY = cy + valueSize + 8;
+        // Position unterhalb des Textes
+        const imgY = cy + valueSize + 2;
+        const imgH = 12; // etwas weniger kräftig; 14 wenn du ihn stärker willst
 
         doc.save();
-        doc.strokeColor(COLOR_WHITE);
-        doc.lineCap('round');
-
-        // Hauptstrich (leicht gebogen)
-        doc
-          .lineWidth(5)
-          .opacity(0.9)
-          .moveTo(x1, baseY)
-          .bezierCurveTo(
-            x1 + textW * 0.25, baseY + 3,
-            x1 + textW * 0.55, baseY - 2,
-            x2, baseY + 1
-          )
-          .stroke();
-
-        // Zweiter „Borsten“-Strich (versetzt, dünner)
-        doc
-          .lineWidth(3)
-          .opacity(0.7)
-          .moveTo(x1 + 4, baseY + 3)
-          .bezierCurveTo(
-            x1 + textW * 0.3, baseY + 6,
-            x1 + textW * 0.6, baseY + 2,
-            x2 - 6, baseY + 4
-          )
-          .stroke();
-
-        // Optional: dritter Mini-Strich für Textur
-        doc
-          .lineWidth(2)
-          .opacity(0.4)
-          .moveTo(x1 + 10, baseY + 6)
-          .lineTo(x2 - 14, baseY + 6)
-          .stroke();
-
+        doc.opacity(0.95);
+        doc.image(BRUSH_WHITE, x1, imgY, { width: textW, height: imgH });
         doc.restore();
       }
+
+      cy += rowH + rowGap;
+    }
+
+    // Footer unten
+    if (footerNote) {
+      doc
+        .fillColor(COLOR_WHITE)
+        .font('Poppins-Light')
+        .fontSize(footerFontSize)
+        .text(safeStr(footerNote), x + padX, y + h - 50, { width: innerW, lineGap: 2 });
+    }
+
+    doc.restore();
+  };
+
+
       
       
       cy += rowH + rowGap;
@@ -467,7 +453,7 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
   // SEITE 2: Aktuelle No-Show-Situation
   // =============================================================
   doc
-    .fillColor(COLOR_BLACK)
+    .fillColor(COLOR_DARK)
     .font('Poppins-Light')
     .fontSize(28)
     .text('Deine aktuelle No-Show-Situation', marginL, 50);
@@ -496,7 +482,7 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     h: tileH,
     title: 'No-Show-Rate (30 Tage)',
     value: `${noShowRate.toFixed(1)}%`,
-    bg: COLOR_BLACK
+    bg: COLOR_DARK
   });
 
   drawKpiTile({
@@ -506,14 +492,14 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     h: tileH,
     title: 'Umsatzverlust (30 Tage)',
     value: `${formatCurrency(loss30 || netLoss30)} ${currency}`,
-    bg: COLOR_BLACK
+    bg: COLOR_DARK
   });
 
   // Benchmark section
   const benchTitleY = tileY + tileH + 34;
 
   doc
-    .fillColor(COLOR_BLACK)
+    .fillColor(COLOR_DARK)
     .font('Poppins-Bold')
     .fontSize(18)
     .text('Vergleichszahlen von Restaurants aus dem DACH-Raum', marginL, benchTitleY);
@@ -540,7 +526,7 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     title: 'Deutschland',
     lines: [
       { text: 'Ø No-Show-Rate', font: 'Poppins-Light', size: 14, color: COLOR_GRAY },
-      { text: 'ca. 15–18 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_BLACK, gap: 0 }
+      { text: 'ca. 15–18 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_DARK, gap: 0 }
     ]
   });
 
@@ -552,7 +538,7 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     title: 'Österreich',
     lines: [
       { text: 'Ø No-Show-Rate', font: 'Poppins-Light', size: 14, color: COLOR_GRAY },
-      { text: 'ca. 14–17 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_BLACK, gap: 0 }
+      { text: 'ca. 14–17 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_DARK, gap: 0 }
     ]
   });
 
@@ -564,7 +550,7 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     title: 'Schweiz',
     lines: [
       { text: 'Ø No-Show-Rate', font: 'Poppins-Light', size: 14, color: COLOR_GRAY },
-      { text: 'ca. 12–15 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_BLACK, gap: 0 }
+      { text: 'ca. 12–15 %',   font: 'Poppins-Bold',  size: 20, color: COLOR_DARK, gap: 0 }
     ]
   });
 
@@ -585,7 +571,7 @@ if (hasOtherTool) {
 
   // Titel
   doc
-    .fillColor(COLOR_BLACK)
+    .fillColor(COLOR_DARK)
     .font('Poppins-Light')
     .fontSize(28)
     .text('Dein Potenzial', marginL, 50);
@@ -614,13 +600,13 @@ if (hasOtherTool) {
 
   // ✅ Überschriften über den Kacheln
   doc
-    .fillColor(COLOR_BLACK)
+    .fillColor(COLOR_DARK)
     .font('Poppins-Bold')
     .fontSize(18)
     .text('Mit bestehender Software:', marginL, headerY, { width: boxW });
 
   doc
-    .fillColor(COLOR_BLACK)
+    .fillColor(COLOR_DARK)
     .font('Poppins-Bold')
     .fontSize(18)
     .text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
@@ -631,7 +617,7 @@ if (hasOtherTool) {
     y: boxY,
     w: boxW,
     h: boxH,
-    bg: COLOR_BLACK,
+    bg: COLOR_DARK,
     items: [
       { label: 'No-Show-Rate', value: `${noShowRate.toFixed(1)} %` },
       {
@@ -694,7 +680,7 @@ if (hasOtherTool) {
   // =============================================================
   ensureNewPage();
 
-  doc.fillColor(COLOR_BLACK).font('Poppins-Light').fontSize(28).text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
+  doc.fillColor(COLOR_DARK).font('Poppins-Light').fontSize(28).text('4 wirksame Maßnahmen gegen No-Shows', marginL, 50);
 
   const tipsX = marginL;
   let tipsY = 105;
@@ -703,7 +689,7 @@ if (hasOtherTool) {
     tipsY += 18; // 👈 zusätzlicher Abstand vor der Überschrift
 
     doc
-      .fillColor(COLOR_BLACK)
+      .fillColor(COLOR_DARK)
       .font('Poppins-Bold')
       .fontSize(18)
       .text(`${n}. ${safeStr(t)}`, tipsX, tipsY);
