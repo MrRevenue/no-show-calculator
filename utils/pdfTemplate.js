@@ -583,14 +583,14 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
 if (hasOtherTool) {
   ensureNewPage();
 
-  // ------------------ Titel ------------------
+  // Titel
   doc
     .fillColor(COLOR_BLACK)
     .font('Poppins-Light')
     .fontSize(28)
     .text('Dein Potenzial', marginL, 50);
 
-  // ------------------ Intro ------------------
+  // Intro
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
@@ -602,13 +602,30 @@ if (hasOtherTool) {
       { width: contentW }
     );
 
-  // ------------------ Layout ------------------
   const boxGap = 26;
   const boxW = (contentW - boxGap) / 2;
-  const boxH = 360;
-  const boxY = 150; // etwas Luft nach oben
 
-  // ------------------ Linke Box: Status quo ------------------
+  // Mehr Abstand nach Intro + Platz für Überschriften
+  const headerY = 155;       // <- Überschriften-Zeile
+  const boxY = headerY + 28; // <- Boxen starten unterhalb der Überschriften
+
+  // Kachelhöhe (so dass Hinweis unten noch passt)
+  const boxH = 360;
+
+  // ✅ Überschriften über den Kacheln
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text('Mit bestehender Software:', marginL, headerY, { width: boxW });
+
+  doc
+    .fillColor(COLOR_BLACK)
+    .font('Poppins-Bold')
+    .fontSize(18)
+    .text('Mit aleno:', marginL + boxW + boxGap, headerY, { width: boxW });
+
+  // Linke Box
   drawBigCompareTile({
     x: marginL,
     y: boxY,
@@ -616,26 +633,17 @@ if (hasOtherTool) {
     h: boxH,
     bg: COLOR_BLACK,
     items: [
-      {
-        label: 'No-Show-Rate',
-        value: `${noShowRate.toFixed(1)} %`
-      },
+      { label: 'No-Show-Rate', value: `${noShowRate.toFixed(1)} %` },
       {
         label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
         value: `${formatCurrency(revenueActual30)} ${currency}`
       },
-      {
-        label: 'Zusätzliches Umsatzpotenzial',
-        value: '—'
-      },
-      {
-        label: 'Zeitersparnis',
-        value: '0 Stunden'
-      }
+      { label: 'Zusätzliches Umsatzpotenzial', value: '—' },
+      { label: 'Zeitersparnis', value: '0 Stunden' }
     ]
   });
 
-  // ------------------ Rechte Box: Mit aleno ------------------
+  // Rechte Box
   drawBigCompareTile({
     x: marginL + boxW + boxGap,
     y: boxY,
@@ -643,10 +651,7 @@ if (hasOtherTool) {
     h: boxH,
     bg: COLOR_PINK,
     items: [
-      {
-        label: 'No-Show-Rate',
-        value: '< 0,3 %'
-      },
+      { label: 'No-Show-Rate', value: '< 0,3 %' },
       {
         label: 'Gesamt-Umsatz über Reservierungen (30 Tage)',
         value: `${formatCurrency(revenueWithAlenoBase)} ${currency}`
@@ -655,18 +660,15 @@ if (hasOtherTool) {
         label: 'Zusätzliches Umsatzpotenzial',
         value: `${formatCurrency(extraUpside15)} ${currency}`,
         valueSize: 18,
-        underlineValue: true   // 🎨 Brush-Stroke
+        underlineValue: true
       },
-      {
-        label: 'Zeitersparnis',
-        value: '14h pro Woche'
-      }
+      { label: 'Zeitersparnis', value: '14h pro Woche' }
     ],
     footerNote:
       '* z. B. durch automatische Auslastungsoptimierung, 360-Grad-Gästedaten für individuelles Upselling, gezielte Ansprache umsatzstarker Gäste etc.'
   });
 
-  // ------------------ Hinweis unten ------------------
+  // Hinweis unten
   doc
     .fillColor(COLOR_GRAY)
     .font('Poppins-Light')
@@ -678,6 +680,7 @@ if (hasOtherTool) {
       { width: contentW }
     );
 }
+
 
 
 
