@@ -348,6 +348,31 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
         .fontSize(valueSize)
         .text(value, x + padX + labelColW, cy, { width: valueColW, align: 'right' });
 
+
+      // ✅ Brush-Underline (optional) – NACH dem Value zeichnen!
+      if (it?.underlineValue) {
+        // sicherstellen, dass widthOfString mit derselben Font/Size arbeitet
+        doc.font('Poppins-Bold').fontSize(valueSize);
+
+        const valueTextW = doc.widthOfString(value);
+
+        // rechte Kante der Value-Spalte
+        const valueBoxX = x + padX + labelColW;
+        const underlineX2 = valueBoxX + valueColW;
+        const underlineX1 = underlineX2 - valueTextW;
+
+        const underlineY = cy + valueSize + 6;
+
+        doc.save();
+        doc.strokeColor(COLOR_WHITE);
+        doc.lineCap('round');
+
+        // Pinsel-Effekt: 2 Striche, leicht versetzt
+        doc.lineWidth(6).moveTo(underlineX1, underlineY).lineTo(underlineX2, underlineY).stroke();
+        doc.lineWidth(3).moveTo(underlineX1 + 2, underlineY + 2).lineTo(underlineX2 - 2, underlineY + 2).stroke();
+
+        doc.restore();
+      }
       cy += rowH + rowGap;
     }
 
