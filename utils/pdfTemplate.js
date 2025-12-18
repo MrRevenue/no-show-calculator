@@ -544,7 +544,7 @@ if (hasOtherTool) {
   // ✅ deutlich kompakter
   const headerY = afterIntroY + 8;
   const boxY = headerY + 24;
-  const boxH = 255; // <— so bleibt Platz für den Hinweis
+  const boxH = 290; // <— so bleibt Platz für den Hinweis
 
   // Überschriften
   doc
@@ -607,7 +607,7 @@ if (hasOtherTool) {
   });
 
   // ✅ Hinweis sicher auf Seite 3: direkt unter den Kacheln, aber nie unter den Seitenrand
-  const hintY = Math.min(boxY + boxH + 18, pageH - 60);
+  const hintY = Math.min(boxY + boxH + 24, pageH - 60);
 
   doc
     .fillColor(COLOR_GRAY)
