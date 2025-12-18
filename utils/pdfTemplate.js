@@ -697,7 +697,7 @@ if (hasOtherTool) {
 
 
 
-  
+
   
 // =============================================================
 // SEITE 5: Whitepaper-Stil + Demo-CTA (FINAL)
@@ -813,14 +813,14 @@ for (const b of benefits) {
 }
 
 // ------------------ CTA unten rechts (fix auf Seite 5) ------------------
-const ctaW = 260;
-const ctaH = 46;
+const ctaW5 = 260;
+const ctaH5 = 46;
 
 drawCTAButton({
-  x: pageW - marginR - ctaW,
+  x: pageW - marginR - ctaW5,
   y: pageH - 90,
-  w: ctaW,
-  h: ctaH,
+  w: ctaW5,
+  h: ctaH5,
   text: 'Jetzt Demo buchen',
   link: 'https://www.aleno.me/de/demo'
 });
