@@ -299,23 +299,22 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
     doc.roundedRect(x, y, w, h, 16).fill(bg);
 
     const padX = 26;
-    const padTop = 28;
+    const padTop = 26;
     const padBottom = 18;
 
     const innerW = w - padX * 2;
 
     // 2-Spalten-Layout
-    const valueColW = 150;                 // Wert-Spalte rechts (fix)
-    const labelColW = innerW - valueColW;  // Label links (wrapt sauber)
+    const valueColW = 150;
+    const labelColW = innerW - valueColW;
 
-    // Footer reservieren (falls vorhanden)
+    // Footer
     const footerFontSize = 9;
     const footerH = footerNote ? 44 : 0;
     const footerY = y + h - footerH;
 
     let cy = y + padTop;
 
-    // Typo Defaults
     const labelSizeDefault = 14;
     const valueSizeDefault = 16;
     const rowGap = 10;
@@ -328,7 +327,6 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
       const valueSize = Number.isFinite(it?.valueSize) ? it.valueSize : valueSizeDefault;
       const valueColor = it?.valueColor || COLOR_WHITE;
 
-      // Höhen für sauberen Umbruch bestimmen
       doc.font('Poppins-Light').fontSize(labelSize);
       const labelH = doc.heightOfString(label, { width: labelColW });
 
@@ -337,69 +335,63 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
 
       const rowH = Math.max(labelH, valueH);
 
-      // Stop, wenn wir in den Footer laufen würden
       if (cy + rowH > footerY - padBottom) break;
 
-      // Label links
+      // Label
       doc
         .fillColor(COLOR_WHITE)
         .font('Poppins-Light')
         .fontSize(labelSize)
         .text(label, x + padX, cy, { width: labelColW });
 
-      // Value rechts (rechtsbündig)
-      const valueBoxX = x + padX + labelColW;
-
+      // Value
       doc
         .fillColor(valueColor)
         .font('Poppins-Bold')
         .fontSize(valueSize)
-        .text(value, valueBoxX, cy, { width: valueColW, align: 'right' });
+        .text(value, x + padX + labelColW, cy, {
+          width: valueColW,
+          align: 'right'
+        });
 
-      // ✅ Brush-Underline NUR als PNG (kein alter Stroke-Code mehr)
-      if (it?.underlineValue && typeof BRUSH_WHITE !== 'undefined' && fs.existsSync(BRUSH_WHITE)) {
-        doc.font('Poppins-Bold').fontSize(valueSize);
+      // ---------------- Brush-Underline ----------------
+      if (it?.underlineValue) {
         const textW = doc.widthOfString(value);
-
-        const x2 = valueBoxX + valueColW; // rechte Kante der Value-Spalte
+        const valueBoxX = x + padX + labelColW;
+        const x2 = valueBoxX + valueColW;
         const x1 = x2 - textW;
-
-        // Position unterhalb des Textes
-        const imgY = cy + valueSize + 2;
-        const imgH = 12; // etwas weniger kräftig; 14 wenn du ihn stärker willst
+        const baseY = cy + valueSize + 8;
 
         doc.save();
-        doc.opacity(0.95);
-        doc.image(BRUSH_WHITE, x1, imgY, { width: textW, height: imgH });
+        doc.strokeColor(COLOR_WHITE).lineCap('round');
+
+        doc
+          .lineWidth(5)
+          .opacity(0.9)
+          .moveTo(x1, baseY)
+          .bezierCurveTo(
+            x1 + textW * 0.25, baseY + 3,
+            x1 + textW * 0.55, baseY - 2,
+            x2, baseY + 1
+          )
+          .stroke();
+
+        doc
+          .lineWidth(3)
+          .opacity(0.6)
+          .moveTo(x1 + 6, baseY + 4)
+          .lineTo(x2 - 8, baseY + 4)
+          .stroke();
+
         doc.restore();
       }
 
+      // 🔑 DAS HAT GEFEHLT
       cy += rowH + rowGap;
     }
 
-    // Footer unten
+    // Footer
     if (footerNote) {
-      doc
-        .fillColor(COLOR_WHITE)
-        .font('Poppins-Light')
-        .fontSize(footerFontSize)
-        .text(safeStr(footerNote), x + padX, y + h - 50, { width: innerW, lineGap: 2 });
-    }
-
-    doc.restore();
-  };
-
-
-      
-      
-      cy += rowH + rowGap;
-    }
-
-    // Footer unten (etwas höher + mehr Luft nach unten)
-    if (footerNote) {
-      const footerBottomPadding = 18; // Abstand zum unteren Rand
-      const footerYOffset = 54;       // wie weit vom unteren Rand nach oben
-
       doc
         .fillColor(COLOR_WHITE)
         .font('Poppins-Light')
@@ -407,13 +399,14 @@ const drawOutlineTile = ({ x, y, w, h, title, lines }) => {
         .text(
           safeStr(footerNote),
           x + padX,
-          y + h - footerYOffset,
+          footerY + 8,
           { width: innerW }
         );
     }
 
     doc.restore();
   };
+
 
 
 
