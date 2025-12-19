@@ -863,19 +863,6 @@ export function generatePdf(formData) {
   const ctaW = 320;
   const ctaY = pageH - 88;
 
-  const drawCTAButton = ({ x, y, w, h, text, link }) => {
-    doc.save();
-    doc.roundedRect(x, y, w, h, 14).fill(COLOR_PINK);
-
-    doc
-      .fillColor(COLOR_WHITE)
-      .font(F.semibold)
-      .fontSize(14)
-      .text(safeStr(text), x, y + 10, { width: w, align: 'center', link });
-
-    doc.restore();
-  };
-
   drawCTAButton({
     x: marginL + (contentW - ctaW) / 2,
     y: ctaY,
