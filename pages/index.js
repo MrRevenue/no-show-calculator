@@ -18,6 +18,7 @@ export default function NoShowCalculator() {
     email: '',
     restaurantName: ''
   });
+
   const [formErrors, setFormErrors] = useState({});
   const [showResult, setShowResult] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
@@ -29,50 +30,74 @@ export default function NoShowCalculator() {
   const [emailError, setEmailError] = useState('');
   const contactFormRef = useRef(null);
 
-  // ✅ MOBILE KEYBOARD FIX: scroll focused field into view + add bottom padding
+  /**
+   * ✅ iFrame-/Mobile-Keyboard Bereinigung
+   *
+   * Problem: In iFrames ist `scrollIntoView({behavior:'smooth'})` + Keyboard/Viewport-Änderungen
+   * extrem anfällig (Scroll blockiert, Jump zum Footer etc.).
+   *
+   * Lösung:
+   * - KEIN globales focusin-scrollIntoView im iFrame
+   * - VisualViewport nur nutzen, um Padding unter Keyboard zu geben
+   * - (optional) keine vv.scroll-Listener (die können in iFrames jitter verursachen)
+   */
   useEffect(() => {
-    const onFocusIn = (e) => {
-      const el = e.target;
-      if (!el) return;
-      const tag = el.tagName?.toLowerCase();
-      if (!['input', 'textarea', 'select'].includes(tag)) return;
+    const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
-      // kleine Verzögerung, damit die Tastatur wirklich offen ist
-      setTimeout(() => {
-        try {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch {}
-      }, 250);
-    };
+    // --- 1) Focus-Scroll-Hack nur außerhalb von iFrames ---
+    let onFocusIn;
+    if (!isInIframe) {
+      onFocusIn = (e) => {
+        const el = e.target;
+        if (!el) return;
+        const tag = el.tagName?.toLowerCase();
+        if (!['input', 'textarea', 'select'].includes(tag)) return;
 
-    window.addEventListener('focusin', onFocusIn);
+        // Wenn überhaupt: ohne smooth, weniger “Scroll-Pingpong”
+        setTimeout(() => {
+          try {
+            el.scrollIntoView({ block: 'nearest' });
+          } catch {}
+        }, 150);
+      };
 
+      window.addEventListener('focusin', onFocusIn);
+    }
+
+    // --- 2) VisualViewport: Keyboard-Höhe als CSS-Variable setzen ---
     const vv = window.visualViewport;
+    let cleanupVv = null;
+
     if (vv) {
       const updateKb = () => {
-        // Keyboard-Höhe (approx.) = innerHeight - sichtbare Höhe - offsetTop
+        // approx Keyboard-Höhe = innerHeight - sichtbare Höhe - offsetTop
         const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
         document.documentElement.style.setProperty('--kb', `${kb}px`);
       };
 
       vv.addEventListener('resize', updateKb);
-      vv.addEventListener('scroll', updateKb);
+
+      // IMPORTANT: vv.scroll kann in iFrames/auf iOS zu Jitter führen
+      // -> testweise deaktiviert; falls ihr außerhalb iFrame braucht, kann man’s gate’n
+      // vv.addEventListener('scroll', updateKb);
+
       updateKb();
 
-      return () => {
-        window.removeEventListener('focusin', onFocusIn);
+      cleanupVv = () => {
         vv.removeEventListener('resize', updateKb);
-        vv.removeEventListener('scroll', updateKb);
+        // vv.removeEventListener('scroll', updateKb);
       };
     }
 
     return () => {
-      window.removeEventListener('focusin', onFocusIn);
+      if (onFocusIn) window.removeEventListener('focusin', onFocusIn);
+      if (cleanupVv) cleanupVv();
     };
   }, []);
 
   useEffect(() => {
     if (showContactForm && contactFormRef.current) {
+      // Hier ist smooth ok, weil es bewusst ein CTA ist – kein Keyboard-Focus-Event.
       contactFormRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [showContactForm]);
@@ -84,9 +109,7 @@ export default function NoShowCalculator() {
     setFormData((prev) => ({ ...prev, [name]: newValue }));
     setFormErrors((prev) => ({ ...prev, [name]: false }));
 
-    if (name === 'email') {
-      setEmailError('');
-    }
+    if (name === 'email') setEmailError('');
 
     if (name === 'hasOnlineReservation' && value !== 'Ja') {
       // Relevante Fehler zurücksetzen, wenn kein System eingesetzt wird
@@ -101,13 +124,8 @@ export default function NoShowCalculator() {
 
   const validateStep = (currentStep = step) => {
     const requiredByStep = {
-      // Schritt 1
       1: ['reservationsPerDay', 'avgGuestsPerReservation', 'noShowGuestsLast30Days'],
-
-      // Schritt 2
       2: ['restaurantType', 'openDays', 'averageSpend', 'hasOnlineReservation'],
-
-      // Schritt 3 – nur wenn Online-Reservierung
       3:
         formData.hasOnlineReservation === 'Ja'
           ? [
@@ -120,34 +138,25 @@ export default function NoShowCalculator() {
 
     const errors = {};
     for (const field of requiredByStep[currentStep] || []) {
-      if (!formData[field]) {
-        errors[field] = true;
-      }
+      if (!formData[field]) errors[field] = true;
     }
     setFormErrors((prev) => ({ ...prev, ...errors }));
     return Object.keys(errors).length === 0;
   };
 
   const goFromStep1 = () => {
-    if (validateStep(1)) {
-      setStep(2);
-    }
+    if (validateStep(1)) setStep(2);
   };
 
   const goFromStep2 = () => {
     if (validateStep(2)) {
-      if (formData.hasOnlineReservation === 'Ja') {
-        setStep(3);
-      } else {
-        setShowResult(true);
-      }
+      if (formData.hasOnlineReservation === 'Ja') setStep(3);
+      else setShowResult(true);
     }
   };
 
   const goFromStep3 = () => {
-    if (validateStep(3)) {
-      setShowResult(true);
-    }
+    if (validateStep(3)) setShowResult(true);
   };
 
   const reservationToolOptions = [
@@ -210,59 +219,46 @@ export default function NoShowCalculator() {
           }`}
         />
       )}
-      {formErrors[field] && (
-        <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
-      )}
+      {formErrors[field] && <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>}
     </div>
   );
 
   const currency = '€';
 
   // --- Rechenlogik (personenbasiert, 30-Tage-Betrachtung) ---
+  const reservationsPerDay = +formData.reservationsPerDay || 0;
+  const avgGuestsPerReservation = +formData.avgGuestsPerReservation || 0;
+  const openDaysPerWeek = +formData.openDays || 0;
+  const avgSpendPerGuest = +formData.averageSpend || 0;
+  const noShowGuestsInput30 = +formData.noShowGuestsLast30Days || 0;
 
-  const reservationsPerDay = +formData.reservationsPerDay || 0; // Ø Reservierungen pro Öffnungstag
-  const avgGuestsPerReservation = +formData.avgGuestsPerReservation || 0; // Ø Gäste pro Reservierung
-  const openDaysPerWeek = +formData.openDays || 0; // Öffnungstage pro Woche
-  const avgSpendPerGuest = +formData.averageSpend || 0; // Ø Umsatz pro Gast
-  const noShowGuestsInput30 = +formData.noShowGuestsLast30Days || 0; // Gäste, die trotz Reservierung nicht erschienen sind (30 Tage)
-
-  // Slider-Defaults für Darstellung
+  // Slider-Defaults
   const avgGuestsSliderValue = avgGuestsPerReservation || 2;
   const avgSpendSliderValue = avgSpendPerGuest || 50;
 
   // Prozentwerte für Bubble
-  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (8 - 1)) * 100; // Range 1–8
-  const avgSpendPercent = ((avgSpendSliderValue - 10) / (500 - 10)) * 100; // Range 10–500
+  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (8 - 1)) * 100;
+  const avgSpendPercent = ((avgSpendSliderValue - 10) / (500 - 10)) * 100;
 
-  // No-Show-Gebühr nur, wenn wirklich erhoben
-  const noShowFeePerGuest =
-    formData.feeForNoShow === 'Ja' ? +formData.noShowFee || 0 : 0;
+  const noShowFeePerGuest = formData.feeForNoShow === 'Ja' ? +formData.noShowFee || 0 : 0;
 
-  // Anzahl Öffnungstage in 30 Tagen (ausgehend von openDaysPerWeek)
   const OPEN_DAYS_30 = openDaysPerWeek > 0 ? (openDaysPerWeek / 7) * 30 : 0;
 
-  // Gesamtreservierungen & Gäste in 30 Tagen
   const totalReservations30 = reservationsPerDay * OPEN_DAYS_30;
   const totalGuests30 = totalReservations30 * avgGuestsPerReservation;
 
-  // No-Show-Gäste in 30 Tagen
   const noShowGuests30 = noShowGuestsInput30;
 
-  // No-Show-Rate bezogen auf Gäste
-  const noShowRate =
-    totalGuests30 > 0 ? (noShowGuests30 / totalGuests30) * 100 : 0;
+  const noShowRate = totalGuests30 > 0 ? (noShowGuests30 / totalGuests30) * 100 : 0;
 
-  // Umsatz in 30 Tagen
   const totalRevenue30 = totalGuests30 * avgSpendPerGuest;
 
-  // No-Show-Verlust in 30 Tagen
-  const grossLoss30 = noShowGuests30 * avgSpendPerGuest; // entgangener Umsatz
-  const recoveredByFees30 = noShowGuests30 * noShowFeePerGuest; // kompensiert durch Gebühren
-  const loss30 = Math.max(grossLoss30 - recoveredByFees30, 0); // Nettoverlust
+  const grossLoss30 = noShowGuests30 * avgSpendPerGuest;
+  const recoveredByFees30 = noShowGuests30 * noShowFeePerGuest;
+  const loss30 = Math.max(grossLoss30 - recoveredByFees30, 0);
 
-  // Upsell-Potenzial & grober ROI – nur für den PDF-Report relevant
-  const upsell = totalRevenue30 * 0.05; // 5% zusätzlicher Umsatz
-  const roi = Math.floor((loss30 + upsell) / 350); // grob bei 350 €/Monat Systemkosten
+  const upsell = totalRevenue30 * 0.05;
+  const roi = Math.floor((loss30 + upsell) / 350);
 
   const format = (val) => Math.round(val).toLocaleString('de-DE');
 
@@ -346,14 +342,14 @@ export default function NoShowCalculator() {
     }
   };
 
-  // Fortschrittsbalken (4 Schritte: 3 Fragen-Schritte + Auswertung)
+  // Fortschrittsbalken (4 Schritte)
   const totalSteps = 4;
   const currentStepForProgress = showResult ? 4 : step;
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
 
   return (
     <div className="kb-safe max-w-xl mx-auto p-6">
-      {/* ✅ MOBILE FIX: gibt Scroll-Platz unter der Tastatur */}
+      {/* ✅ Keyboard-safe padding (über CSS-Variable --kb) */}
       <style jsx global>{`
         .kb-safe {
           padding-bottom: calc(var(--kb, 0px) + 24px);
@@ -373,7 +369,7 @@ export default function NoShowCalculator() {
         </p>
       </div>
 
-      {/* Schritt 1: Basisangaben – Reservierungen & No-Shows (Personen) */}
+      {/* Schritt 1 */}
       {!showResult && step === 1 && (
         <>
           <h2 className="text-2xl font-bold mb-2">
@@ -402,8 +398,8 @@ export default function NoShowCalculator() {
               <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
             )}
             <p className="text-xs text-gray-500 mt-1">
-              Wie viele Reservierungen (also nicht Anzahl Gäste) hast du an einem typischen Öffnungstag im Durchschnitt – egal ob
-              online, telefonisch oder per E-Mail?
+              Wie viele Reservierungen (also nicht Anzahl Gäste) hast du an einem typischen Öffnungstag
+              im Durchschnitt – egal ob online, telefonisch oder per E-Mail?
             </p>
           </div>
 
@@ -414,18 +410,13 @@ export default function NoShowCalculator() {
             </label>
 
             <div className="relative w-full">
-              {/* Value Bubble */}
               <div
                 className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
-                style={{
-                  left: `${avgGuestsPercent}%`,
-                  transform: 'translateX(-50%)'
-                }}
+                style={{ left: `${avgGuestsPercent}%`, transform: 'translateX(-50%)' }}
               >
                 {avgGuestsSliderValue}
               </div>
 
-              {/* Pink Slider */}
               <input
                 type="range"
                 name="avgGuestsPerReservation"
@@ -479,7 +470,7 @@ export default function NoShowCalculator() {
         </>
       )}
 
-      {/* Schritt 2: Restaurant & Wirtschaftlichkeit + Online-Reservierung */}
+      {/* Schritt 2 */}
       {!showResult && step === 2 && (
         <>
           <h2 className="text-xl font-bold mb-4">Angaben zu deinem Restaurant</h2>
@@ -491,11 +482,7 @@ export default function NoShowCalculator() {
             restaurantTypeOptions
           )}
 
-          {renderField(
-            'openDays',
-            'Anzahl Tage pro Woche geöffnet (z. B. 5)',
-            'number'
-          )}
+          {renderField('openDays', 'Anzahl Tage pro Woche geöffnet (z. B. 5)', 'number')}
 
           {/* Ø Umsatz pro Gast – Slider bis 500 € */}
           <div className="mb-10">
@@ -504,18 +491,13 @@ export default function NoShowCalculator() {
             </label>
 
             <div className="relative w-full">
-              {/* Value Bubble */}
               <div
                 className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
-                style={{
-                  left: `${avgSpendPercent}%`,
-                  transform: 'translateX(-50%)'
-                }}
+                style={{ left: `${avgSpendPercent}%`, transform: 'translateX(-50%)' }}
               >
                 {avgSpendSliderValue} {currency}
               </div>
 
-              {/* Pink Slider */}
               <input
                 type="range"
                 name="averageSpend"
@@ -562,7 +544,7 @@ export default function NoShowCalculator() {
         </>
       )}
 
-      {/* Schritt 3: Details zum Reservierungssystem (nur falls Ja) */}
+      {/* Schritt 3 */}
       {!showResult && step === 3 && formData.hasOnlineReservation === 'Ja' && (
         <>
           <h2 className="text-xl font-bold mb-4">Details zum Reservierungssystem</h2>
@@ -574,19 +556,10 @@ export default function NoShowCalculator() {
             reservationToolOptions
           )}
 
-          {renderField(
-            'feeForNoShow',
-            'Werden No-Show-Gebühren erhoben?',
-            'text',
-            ['', 'Ja', 'Nein']
-          )}
+          {renderField('feeForNoShow', 'Werden No-Show-Gebühren erhoben?', 'text', ['', 'Ja', 'Nein'])}
 
           {formData.feeForNoShow === 'Ja' &&
-            renderField(
-              'noShowFee',
-              `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`,
-              'number'
-            )}
+            renderField('noShowFee', `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, 'number')}
 
           <div className="flex justify-between mt-4">
             <button
@@ -613,13 +586,11 @@ export default function NoShowCalculator() {
           <h2 className="text-2xl font-bold text-center mb-6">Deine Auswertung</h2>
 
           <div className="grid gap-4 sm:grid-cols-2 mb-8">
-            {/* No-Show-Rate */}
             <div className="bg-black text-white p-6 rounded-xl text-center">
               <h3 className="text-sm mb-1">No-Show-Rate (30 Tage)</h3>
               <p className="text-3xl font-semibold">{noShowRate.toFixed(1)}%</p>
             </div>
 
-            {/* No-Show-Verlust */}
             <div className="bg-black text-white p-6 rounded-xl text-center">
               <h3 className="text-sm mb-1">Umsatzverlust durch No-Shows (30 Tage)</h3>
               <p className="text-3xl font-semibold">
@@ -628,7 +599,6 @@ export default function NoShowCalculator() {
             </div>
           </div>
 
-          {/* Call to Action */}
           {showForm && (
             <div className="text-center mt-6">
               <p className="mb-4 font-medium">
@@ -646,7 +616,6 @@ export default function NoShowCalculator() {
             </div>
           )}
 
-          {/* Kontaktformular */}
           {showContactForm && !submissionSuccess && (
             <form
               ref={contactFormRef}
@@ -691,9 +660,7 @@ export default function NoShowCalculator() {
                   className="border border-gray-300 p-2 rounded w-full"
                   required
                 />
-                {emailError && (
-                  <p className="text-red-600 text-sm mt-1">{emailError}</p>
-                )}
+                {emailError && <p className="text-red-600 text-sm mt-1">{emailError}</p>}
               </div>
 
               <div className="flex items-start">
@@ -724,9 +691,7 @@ export default function NoShowCalculator() {
               </div>
 
               {showPolicyError && (
-                <p className="text-red-600 text-sm">
-                  Bitte bestätige die Datenschutzerklärung.
-                </p>
+                <p className="text-red-600 text-sm">Bitte bestätige die Datenschutzerklärung.</p>
               )}
 
               <button
@@ -745,13 +710,10 @@ export default function NoShowCalculator() {
             </form>
           )}
 
-          {/* Erfolgsmeldung */}
           {submissionSuccess && (
             <div className="text-center bg-green-100 border border-green-300 p-6 rounded-xl mt-6">
               <h2 className="text-xl font-semibold mb-2 text-green-800">Vielen Dank!</h2>
-              <p className="text-green-700">
-                Dein No-Show-Report wurde erfolgreich per E-Mail versendet.
-              </p>
+              <p className="text-green-700">Dein No-Show-Report wurde erfolgreich per E-Mail versendet.</p>
             </div>
           )}
         </>
