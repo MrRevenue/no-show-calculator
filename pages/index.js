@@ -29,6 +29,48 @@ export default function NoShowCalculator() {
   const [emailError, setEmailError] = useState('');
   const contactFormRef = useRef(null);
 
+  // ✅ MOBILE KEYBOARD FIX: scroll focused field into view + add bottom padding
+  useEffect(() => {
+    const onFocusIn = (e) => {
+      const el = e.target;
+      if (!el) return;
+      const tag = el.tagName?.toLowerCase();
+      if (!['input', 'textarea', 'select'].includes(tag)) return;
+
+      // kleine Verzögerung, damit die Tastatur wirklich offen ist
+      setTimeout(() => {
+        try {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch {}
+      }, 250);
+    };
+
+    window.addEventListener('focusin', onFocusIn);
+
+    const vv = window.visualViewport;
+    if (vv) {
+      const updateKb = () => {
+        // Keyboard-Höhe (approx.) = innerHeight - sichtbare Höhe - offsetTop
+        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        document.documentElement.style.setProperty('--kb', `${kb}px`);
+      };
+
+      vv.addEventListener('resize', updateKb);
+      vv.addEventListener('scroll', updateKb);
+      updateKb();
+
+      return () => {
+        window.removeEventListener('focusin', onFocusIn);
+        vv.removeEventListener('resize', updateKb);
+        vv.removeEventListener('scroll', updateKb);
+      };
+    }
+
+    return () => {
+      window.removeEventListener('focusin', onFocusIn);
+    };
+  }, []);
+
   useEffect(() => {
     if (showContactForm && contactFormRef.current) {
       contactFormRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -109,23 +151,23 @@ export default function NoShowCalculator() {
   };
 
   const reservationToolOptions = [
-  '',
-  'aleno',
-  'CentralPlanner',
-  'Formitable',
-  'Foratable',
-  'Gastronovi',
-  'OpenTable',
-  'Quandoo',
-  'Resmio',
-  'Seatris',
-  'Sevenrooms',
-  'Tablein',
-  'The Fork',
-  'Zenchef',
-  'ein anderes',
-  'Das weiß ich gerade nicht'
-];
+    '',
+    'aleno',
+    'CentralPlanner',
+    'Formitable',
+    'Foratable',
+    'Gastronovi',
+    'OpenTable',
+    'Quandoo',
+    'Resmio',
+    'Seatris',
+    'Sevenrooms',
+    'Tablein',
+    'The Fork',
+    'Zenchef',
+    'ein anderes',
+    'Das weiß ich gerade nicht'
+  ];
 
   const restaurantTypeOptions = [
     '',
@@ -310,7 +352,14 @@ export default function NoShowCalculator() {
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
 
   return (
-    <div className="max-w-xl mx-auto p-6">
+    <div className="kb-safe max-w-xl mx-auto p-6">
+      {/* ✅ MOBILE FIX: gibt Scroll-Platz unter der Tastatur */}
+      <style jsx global>{`
+        .kb-safe {
+          padding-bottom: calc(var(--kb, 0px) + 24px);
+        }
+      `}</style>
+
       {/* Fortschrittsbalken */}
       <div className="mb-6">
         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -324,112 +373,111 @@ export default function NoShowCalculator() {
         </p>
       </div>
 
-{/* Schritt 1: Basisangaben – Reservierungen & No-Shows (Personen) */}
-{!showResult && step === 1 && (
-  <>
-    <h2 className="text-2xl font-bold mb-2">
-      Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust
-    </h2>
-    <p className="text-sm text-gray-600 mb-4">
-      Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen
-      Reservierungen.
-    </p>
+      {/* Schritt 1: Basisangaben – Reservierungen & No-Shows (Personen) */}
+      {!showResult && step === 1 && (
+        <>
+          <h2 className="text-2xl font-bold mb-2">
+            Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen
+            Reservierungen.
+          </p>
 
-    {/* 1. Ø Reservierungen pro Öffnungstag */}
-    <div className="mb-8">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Ø Reservierungen pro Öffnungstag (alle Kanäle, z. B. 40)
-      </label>
-      <input
-        name="reservationsPerDay"
-        type="number"
-        value={formData.reservationsPerDay}
-        onChange={handleChange}
-        className={`border p-2 w-full rounded ${
-          formErrors.reservationsPerDay ? 'border-pink-500' : 'border-gray-300'
-        }`}
-      />
-      {formErrors.reservationsPerDay && (
-        <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
+          {/* 1. Ø Reservierungen pro Öffnungstag */}
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ø Reservierungen pro Öffnungstag (alle Kanäle, z. B. 40)
+            </label>
+            <input
+              name="reservationsPerDay"
+              type="number"
+              value={formData.reservationsPerDay}
+              onChange={handleChange}
+              className={`border p-2 w-full rounded ${
+                formErrors.reservationsPerDay ? 'border-pink-500' : 'border-gray-300'
+              }`}
+            />
+            {formErrors.reservationsPerDay && (
+              <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Wie viele Reservierungen (also nicht Anzahl Gäste) hast du an einem typischen Öffnungstag im Durchschnitt – egal ob
+              online, telefonisch oder per E-Mail?
+            </p>
+          </div>
+
+          {/* 2. Ø Gäste pro Reservierung – Slider */}
+          <div className="mb-10">
+            <label className="block text-sm font-medium text-gray-700 mb-4">
+              Ø Gäste pro Reservierung (z. B. 2,0&nbsp;Personen)
+            </label>
+
+            <div className="relative w-full">
+              {/* Value Bubble */}
+              <div
+                className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
+                style={{
+                  left: `${avgGuestsPercent}%`,
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                {avgGuestsSliderValue}
+              </div>
+
+              {/* Pink Slider */}
+              <input
+                type="range"
+                name="avgGuestsPerReservation"
+                min="1"
+                max="8"
+                step="0.5"
+                value={avgGuestsSliderValue}
+                onChange={handleChange}
+                className="pink-slider"
+              />
+            </div>
+
+            <p className="text-xs text-gray-500 mt-1">
+              Die meisten Restaurants liegen zwischen 2,0 und 3,0 Gästen pro Reservierung.
+            </p>
+            {formErrors.avgGuestsPerReservation && (
+              <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
+            )}
+          </div>
+
+          {/* 3. No-Shows in Personen */}
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung ohne rechtzeitige Absage
+              nicht erschienen? (Schätzung)
+            </label>
+            <input
+              name="noShowGuestsLast30Days"
+              type="number"
+              value={formData.noShowGuestsLast30Days}
+              onChange={handleChange}
+              className={`border p-2 w-full rounded ${
+                formErrors.noShowGuestsLast30Days ? 'border-pink-500' : 'border-gray-300'
+              }`}
+            />
+            {formErrors.noShowGuestsLast30Days && (
+              <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={goFromStep1}
+            className="mt-6 bg-pink-500 text-white px-8 py-3 rounded-full font-semibold"
+          >
+            Weiter
+          </button>
+        </>
       )}
-      <p className="text-xs text-gray-500 mt-1">
-        Wie viele Reservierungen (also nicht Anzahl Gäste) hast du an einem typischen Öffnungstag im Durchschnitt – egal ob
-        online, telefonisch oder per E-Mail?
-      </p>
-    </div>
-
-    {/* 2. Ø Gäste pro Reservierung – Slider */}
-    <div className="mb-10">
-      <label className="block text-sm font-medium text-gray-700 mb-4">
-        Ø Gäste pro Reservierung (z. B. 2,0&nbsp;Personen)
-      </label>
-
-      <div className="relative w-full">
-        {/* Value Bubble */}
-        <div
-          className="absolute -top-4 text-xs font-semibold text-pink-600 whitespace-nowrap"
-          style={{
-            left: `${avgGuestsPercent}%`,
-            transform: 'translateX(-50%)'
-          }}
-        >
-          {avgGuestsSliderValue}
-        </div>
-
-        {/* Pink Slider */}
-        <input
-          type="range"
-          name="avgGuestsPerReservation"
-          min="1"
-          max="8"
-          step="0.5"
-          value={avgGuestsSliderValue}
-          onChange={handleChange}
-          className="pink-slider"
-        />
-      </div>
-
-      <p className="text-xs text-gray-500 mt-1">
-        Die meisten Restaurants liegen zwischen 2,0 und 3,0 Gästen pro Reservierung.
-      </p>
-      {formErrors.avgGuestsPerReservation && (
-        <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
-      )}
-    </div>
-
-    {/* 3. No-Shows in Personen */}
-    <div className="mb-8">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung ohne rechtzeitige Absage
-        nicht erschienen? (Schätzung)
-      </label>
-      <input
-        name="noShowGuestsLast30Days"
-        type="number"
-        value={formData.noShowGuestsLast30Days}
-        onChange={handleChange}
-        className={`border p-2 w-full rounded ${
-          formErrors.noShowGuestsLast30Days ? 'border-pink-500' : 'border-gray-300'
-        }`}
-      />
-      {formErrors.noShowGuestsLast30Days && (
-        <p className="text-pink-500 text-xs mt-1">Bitte ausfüllen.</p>
-      )}
-      <p className="text-xs text-gray-500 mt-1">
-        Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen.
-      </p>
-    </div>
-
-    <button
-      type="button"
-      onClick={goFromStep1}
-      className="mt-6 bg-pink-500 text-white px-8 py-3 rounded-full font-semibold"
-    >
-      Weiter
-    </button>
-  </>
-)}
-
 
       {/* Schritt 2: Restaurant & Wirtschaftlichkeit + Online-Reservierung */}
       {!showResult && step === 2 && (
