@@ -109,22 +109,23 @@ export default function NoShowCalculator() {
   };
 
   const reservationToolOptions = [
-    '',
-    'aleno',
-    'CentralPlanner',
-    'Formitable',
-    'Foratable',
-    'Gastronovi',
-    'OpenTable',
-    'Quandoo',
-    'Resmio',
-    'Seatris',
-    'Tablein',
-    'The Fork',
-    'Zenchef',
-    'ein anderes',
-    'Das weiß ich gerade nicht'
-  ];
+  '',
+  'aleno',
+  'CentralPlanner',
+  'Formitable',
+  'Foratable',
+  'Gastronovi',
+  'OpenTable',
+  'Quandoo',
+  'Resmio',
+  'Seatris',
+  'Sevenrooms',
+  'Tablein',
+  'The Fork',
+  'Zenchef',
+  'ein anderes',
+  'Das weiß ich gerade nicht'
+];
 
   const restaurantTypeOptions = [
     '',
