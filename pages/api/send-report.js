@@ -90,7 +90,8 @@ async function submitToHubSpotForm({ portalId, formGuid, token, region, fields, 
   }
 
   const hsRegion = region || "na1";
-  const url = `https://api.hsforms.${hsRegion}/submissions/v3/integration/secure/submit/${portalId}/${formGuid}`;
+  const url = `https://api.hsforms.com/submissions/v3/integration/secure/submit/${portalId}/${formGuid}`;
+
 
   if (debug) {
     console.log("HUBSPOT DEBUG -> url:", url);
