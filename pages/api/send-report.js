@@ -2,7 +2,7 @@
 import nodemailer from "nodemailer";
 import { PassThrough } from "stream";
 import { generatePdf } from "../../utils/pdfTemplate";
-import UAParser from "ua-parser-js";
+import * as UAParserPkg from "ua-parser-js";
 
 console.log("SEND-REPORT LOADED", __filename);
 
@@ -30,7 +30,12 @@ function getClientIp(req) {
 
 function parseUa(req) {
   const uaString = req.headers["user-agent"] || "";
-  const parser = new UAParser(String(uaString));
+
+  // robust gegen ESM/CJS Export-Unterschiede
+  const UAParserCtor =
+    UAParserPkg?.UAParser || UAParserPkg?.default || UAParserPkg;
+
+  const parser = new UAParserCtor(String(uaString));
   const ua = parser.getResult();
 
   const deviceType =
@@ -52,6 +57,7 @@ function parseUa(req) {
 
   return { deviceType, browser, os };
 }
+
 
 function getHubspotUtkFromCookie(req) {
   const cookieHeader = req.headers.cookie || "";
