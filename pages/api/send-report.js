@@ -6,6 +6,12 @@ import * as UAParserPkg from "ua-parser-js";
 
 console.log("SEND-REPORT LOADED", __filename);
 
+/** ✅ CORS: erlaubte Origins (HubSpot Landingpage) */
+const ALLOWED_ORIGINS = [
+  "https://www.aleno.me",
+  "https://aleno.me", // optional, falls ihr auch ohne www nutzt
+];
+
 function streamToBuffer(readable) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -32,8 +38,7 @@ function parseUa(req) {
   const uaString = req.headers["user-agent"] || "";
 
   // robust gegen ESM/CJS Export-Unterschiede
-  const UAParserCtor =
-    UAParserPkg?.UAParser || UAParserPkg?.default || UAParserPkg;
+  const UAParserCtor = UAParserPkg?.UAParser || UAParserPkg?.default || UAParserPkg;
 
   const parser = new UAParserCtor(String(uaString));
   const ua = parser.getResult();
@@ -45,19 +50,16 @@ function parseUa(req) {
         ? "tablet"
         : "desktop";
 
-  const browser =
-    ua.browser?.name
-      ? `${ua.browser.name}${ua.browser.version ? " " + ua.browser.version : ""}`.trim()
-      : "unknown";
+  const browser = ua.browser?.name
+    ? `${ua.browser.name}${ua.browser.version ? " " + ua.browser.version : ""}`.trim()
+    : "unknown";
 
-  const os =
-    ua.os?.name
-      ? `${ua.os.name}${ua.os.version ? " " + ua.os.version : ""}`.trim()
-      : "unknown";
+  const os = ua.os?.name
+    ? `${ua.os.name}${ua.os.version ? " " + ua.os.version : ""}`.trim()
+    : "unknown";
 
   return { deviceType, browser, os };
 }
-
 
 function getHubspotUtkFromCookie(req) {
   const cookieHeader = req.headers.cookie || "";
@@ -82,7 +84,15 @@ function sanitizeFields(fields) {
   });
 }
 
-async function submitToHubSpotForm({ portalId, formGuid, token, region, fields, context, debug }) {
+async function submitToHubSpotForm({
+  portalId,
+  formGuid,
+  token,
+  region,
+  fields,
+  context,
+  debug,
+}) {
   if (!portalId || !formGuid || !token) {
     throw new Error(
       "Missing HubSpot ENV (HUBSPOT_PORTAL_ID / HUBSPOT_FORM_GUID / HUBSPOT_PRIVATE_APP_TOKEN)."
@@ -91,7 +101,6 @@ async function submitToHubSpotForm({ portalId, formGuid, token, region, fields, 
 
   const hsRegion = region || "na1";
   const url = `https://api.hsforms.com/submissions/v3/integration/secure/submit/${portalId}/${formGuid}`;
-
 
   if (debug) {
     console.log("HUBSPOT DEBUG -> url:", url);
@@ -134,9 +143,25 @@ async function submitToHubSpotForm({ portalId, formGuid, token, region, fields, 
 }
 
 export default async function handler(req, res) {
+  /** ✅ CORS Header immer als erstes setzen */
+  const origin = req.headers.origin;
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin"); // wichtig für CDN-Caching
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  /** ✅ Preflight Requests beantworten */
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   // Allow only POST
   if (req.method !== "POST") {
-    res.setHeader("Allow", ["POST"]);
+    res.setHeader("Allow", ["POST", "OPTIONS"]);
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
 
