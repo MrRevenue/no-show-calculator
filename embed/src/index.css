@@ -1,102 +1,178 @@
-/* ================================
-   Fonts
-   ================================ */
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+/* =========================================================
+   EMBED – Shadow DOM Baseline
+   Gilt NUR im Shadow Root
+   ========================================================= */
 
-/* Tailwind v4 (CSS-first) */
-@import "tailwindcss";
+/* Google Font – wird im Shadow geladen */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
 
-/* ================================
-   Scoped Embed Baseline
-   ================================ */
-#no-show-calculator {
-  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-  font-size: 16px; /* wichtig: verhindert Mobile Zoom bei Inputs */
+/* Root des Shadow DOM */
+:host {
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+    Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 16px; /* wichtig: verhindert Mobile-Zoom */
   line-height: 1.4;
   color: #111827;
 }
 
-/* Box sizing nur im Embed */
-#no-show-calculator *,
-#no-show-calculator *::before,
-#no-show-calculator *::after {
+/* Box sizing – absolut notwendig im Embed */
+:host *,
+:host *::before,
+:host *::after {
   box-sizing: border-box;
 }
 
-/* Headings & Text – HubSpot-sicher */
-#no-show-calculator h1,
-#no-show-calculator h2,
-#no-show-calculator h3 {
+/* =========================================================
+   Layout / Container
+   ========================================================= */
+
+:host #ns-mount {
+  width: 100%;
+}
+
+:host .kb-safe {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px;
+  padding-bottom: calc(var(--kb, 0px) + 24px);
+}
+
+/* =========================================================
+   Typografie
+   ========================================================= */
+
+:host h2 {
   margin: 0 0 0.5rem 0;
+  font-size: 24px;
   font-weight: 600;
+  line-height: 1.25;
 }
 
-#no-show-calculator p {
+:host h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+:host p {
   margin: 0.25rem 0;
+  font-size: 14px;
+  color: #6b7280;
 }
 
-/* ================================
-   Forms – HubSpot Override Safe
-   ================================ */
-#no-show-calculator input,
-#no-show-calculator select,
-#no-show-calculator textarea {
+/* =========================================================
+   Labels
+   ========================================================= */
+
+:host label {
+  display: block;
+  margin: 0 0 6px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* =========================================================
+   Inputs / Selects / Textarea
+   ========================================================= */
+
+:host input,
+:host select,
+:host textarea {
+  font-family: inherit;
   font-size: 16px;
   line-height: 1.25;
   padding: 10px 12px;
   width: 100%;
   border-radius: 8px;
   border: 1px solid #d1d5db;
-  background: #fff;
-  color: inherit;
+  background: #ffffff;
+  color: #111827;
 }
 
-#no-show-calculator input:focus,
-#no-show-calculator select:focus,
-#no-show-calculator textarea:focus {
+:host input:focus,
+:host select:focus,
+:host textarea:focus {
   outline: none;
   border-color: #ec4899;
-  box-shadow: 0 0 0 1px #ec4899;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
 }
 
-#no-show-calculator label {
-  display: block;
-  margin: 0 0 6px 0;
-  font-size: 14px;
-  font-weight: 500;
+/* Fehlerzustand */
+:host .border-pink-500 {
+  border-color: #ec4899;
 }
 
-/* Buttons – nicht von HubSpot überschreiben lassen */
-#no-show-calculator button {
+:host .text-pink-500 {
+  color: #ec4899;
+}
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+
+:host button {
   font-family: inherit;
   font-size: 14px;
+  font-weight: 600;
   line-height: 1;
+  padding: 14px 28px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: #ec4899;
+  color: #ffffff;
 }
 
-/* ================================
-   Keyboard / Mobile Safe Padding
-   ================================ */
-#no-show-calculator .kb-safe {
-  padding-bottom: calc(var(--kb, 0px) + 24px);
+:host button:hover {
+  background: #db2777;
 }
 
-/* ================================
-   Pink Slider Styles
-   ================================ */
-#no-show-calculator .pink-slider {
+:host button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Secondary */
+:host .bg-gray-200 {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+/* =========================================================
+   Progress Bar
+   ========================================================= */
+
+:host .progress {
+  width: 100%;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+:host .progress-fill {
+  height: 100%;
+  background: #ec4899;
+  transition: width 0.3s ease;
+}
+
+/* =========================================================
+   Pink Slider (KRITISCH – war im HubSpot blau!)
+   ========================================================= */
+
+:host .pink-slider {
   width: 100%;
   appearance: none;
-  -webkit-appearance: none;
   height: 6px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: #f3d0e4;
   outline: none;
+  margin: 8px 0;
 }
 
-/* WebKit Thumb */
-#no-show-calculator .pink-slider::-webkit-slider-thumb {
+:host .pink-slider::-webkit-slider-thumb {
   appearance: none;
-  -webkit-appearance: none;
   width: 22px;
   height: 22px;
   border-radius: 999px;
@@ -106,8 +182,7 @@
   cursor: pointer;
 }
 
-/* Firefox Thumb */
-#no-show-calculator .pink-slider::-moz-range-thumb {
+:host .pink-slider::-moz-range-thumb {
   width: 22px;
   height: 22px;
   border-radius: 999px;
@@ -117,17 +192,22 @@
   cursor: pointer;
 }
 
-/* ================================
-   Utility Fixes (optional)
-   ================================ */
+/* =========================================================
+   Utility
+   ========================================================= */
 
-/* Verhindert, dass HubSpot Buttons kaputt styled */
-#no-show-calculator button[type="submit"] {
-  -webkit-appearance: none;
-  appearance: none;
+:host .text-center {
+  text-align: center;
 }
 
-/* Saubere Listen, falls verwendet */
-#no-show-calculator ul {
-  padding-left: 1.25rem;
+:host .mt-6 {
+  margin-top: 24px;
+}
+
+:host .mb-6 {
+  margin-bottom: 24px;
+}
+
+:host .mb-8 {
+  margin-bottom: 32px;
 }
