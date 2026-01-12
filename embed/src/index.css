@@ -1,99 +1,32 @@
+/* ================================
+   Fonts
+   ================================ */
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
 
-tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4 (CSS-first) */
+@import "tailwindcss";
 
-:root {
-  font-family: "Poppins", system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-.kb-safe {
-  padding-bottom: calc(var(--kb, 0px) + 24px);
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
-
-
-/* --- Embed Reset / Baseline (scoped) --- */
+/* ================================
+   Scoped Embed Baseline
+   ================================ */
 #no-show-calculator {
-  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto,
-    Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  font-size: 16px;            /* verhindert iOS/Android Zoom bei Inputs */
+  font-family: "Poppins", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font-size: 16px; /* wichtig: verhindert Mobile Zoom bei Inputs */
   line-height: 1.4;
   color: #111827;
 }
 
+/* Box sizing nur im Embed */
 #no-show-calculator *,
 #no-show-calculator *::before,
 #no-show-calculator *::after {
   box-sizing: border-box;
 }
 
-#no-show-calculator h2 {
+/* Headings & Text – HubSpot-sicher */
+#no-show-calculator h1,
+#no-show-calculator h2,
+#no-show-calculator h3 {
   margin: 0 0 0.5rem 0;
   font-weight: 600;
 }
@@ -102,11 +35,12 @@ button:focus-visible {
   margin: 0.25rem 0;
 }
 
-/* Inputs / Selects / Textareas */
+/* ================================
+   Forms – HubSpot Override Safe
+   ================================ */
 #no-show-calculator input,
 #no-show-calculator select,
 #no-show-calculator textarea {
-  font-family: inherit;
   font-size: 16px;
   line-height: 1.25;
   padding: 10px 12px;
@@ -117,7 +51,14 @@ button:focus-visible {
   color: inherit;
 }
 
-/* Labels */
+#no-show-calculator input:focus,
+#no-show-calculator select:focus,
+#no-show-calculator textarea:focus {
+  outline: none;
+  border-color: #ec4899;
+  box-shadow: 0 0 0 1px #ec4899;
+}
+
 #no-show-calculator label {
   display: block;
   margin: 0 0 6px 0;
@@ -125,45 +66,68 @@ button:focus-visible {
   font-weight: 500;
 }
 
-/* Buttons */
+/* Buttons – nicht von HubSpot überschreiben lassen */
 #no-show-calculator button {
   font-family: inherit;
   font-size: 14px;
   line-height: 1;
 }
 
-/* Keyboard-safe Padding */
+/* ================================
+   Keyboard / Mobile Safe Padding
+   ================================ */
 #no-show-calculator .kb-safe {
   padding-bottom: calc(var(--kb, 0px) + 24px);
 }
 
-/* --- Pink Slider Styles --- */
+/* ================================
+   Pink Slider Styles
+   ================================ */
 #no-show-calculator .pink-slider {
   width: 100%;
   appearance: none;
+  -webkit-appearance: none;
   height: 6px;
   border-radius: 999px;
   background: #e5e7eb;
   outline: none;
 }
 
+/* WebKit Thumb */
 #no-show-calculator .pink-slider::-webkit-slider-thumb {
   appearance: none;
+  -webkit-appearance: none;
   width: 22px;
   height: 22px;
   border-radius: 999px;
   background: #ec4899;
-  border: 3px solid #fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   cursor: pointer;
 }
 
+/* Firefox Thumb */
 #no-show-calculator .pink-slider::-moz-range-thumb {
   width: 22px;
   height: 22px;
   border-radius: 999px;
   background: #ec4899;
-  border: 3px solid #fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   cursor: pointer;
+}
+
+/* ================================
+   Utility Fixes (optional)
+   ================================ */
+
+/* Verhindert, dass HubSpot Buttons kaputt styled */
+#no-show-calculator button[type="submit"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Saubere Listen, falls verwendet */
+#no-show-calculator ul {
+  padding-left: 1.25rem;
 }
