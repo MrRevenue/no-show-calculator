@@ -320,7 +320,8 @@ export default function NoShowCalculator() {
     };
 
     try {
-      const res = await fetch('/api/send-report', {
+      const res = await fetch('https://no-show-calculator.vercel.app/api/send-report', {
+  method: 'POST',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(fullFormData)

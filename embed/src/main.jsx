@@ -1,8 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import NoShowCalculator from "./NoShowCalculator.jsx";
-
-// KEIN globales CSS import hier nötig, weil wir es im Shadow DOM per <link> laden.
+import "./index.css"; // ✅ wichtig: damit Vite embed.css überhaupt erzeugt
 
 const MOUNT_ID = "no-show-calculator";
 
@@ -10,7 +9,6 @@ function mountShadow() {
   const container = document.getElementById(MOUNT_ID);
   if (!container) return;
 
-  // Host nur einmal anlegen
   let host = container.querySelector(":scope > .ns-shadow-host");
   if (!host) {
     host = document.createElement("div");
@@ -18,20 +16,19 @@ function mountShadow() {
     container.appendChild(host);
   }
 
-  // Shadow root nur einmal
   const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
 
   // CSS im Shadow laden (aus demselben Ordner wie embed.js)
   const cssHref = new URL("./embed.css", import.meta.url).href;
+
   if (!shadow.querySelector(`link[data-ns-embed="1"]`)) {
     const link = document.createElement("link");
-    link.setAttribute("rel", "stylesheet");
-    link.setAttribute("href", cssHref);
+    link.rel = "stylesheet";
+    link.href = cssHref;
     link.setAttribute("data-ns-embed", "1");
     shadow.appendChild(link);
   }
 
-  // Mount node im Shadow
   let mount = shadow.querySelector("#ns-mount");
   if (!mount) {
     mount = document.createElement("div");
@@ -39,7 +36,6 @@ function mountShadow() {
     shadow.appendChild(mount);
   }
 
-  // React root nur einmal pro Mount
   if (!mount.__noShowRoot) {
     mount.__noShowRoot = createRoot(mount);
   }
