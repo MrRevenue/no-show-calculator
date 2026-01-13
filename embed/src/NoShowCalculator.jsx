@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 export default function NoShowCalculator() {
+  const MAX_GUESTS_PER_RES = 10; // ✅ bis 10
+  const DAYS_30 = 30;
+  const HEADER_OFFSET = 110;
+
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     restaurantType: "",
@@ -34,12 +38,6 @@ export default function NoShowCalculator() {
   const progressWrapRef = useRef(null);
 
   // ------------------------------------------------------------
-  // Config
-  // ------------------------------------------------------------
-  const HEADER_OFFSET = 110;
-  const MAX_GUESTS_PER_RES = 10;
-
-  // ------------------------------------------------------------
   // Scroll helpers (Sticky Header)
   // ------------------------------------------------------------
   const scrollToElWithOffset = useCallback((el, behavior = "smooth", extraOffset = 0) => {
@@ -61,7 +59,7 @@ export default function NoShowCalculator() {
   );
 
   // ------------------------------------------------------------
-  // Shadow-DOM aware: wirklich fokussiertes Element finden
+  // Shadow-DOM aware active element (HubSpot/Embeds können Shadow nutzen)
   // ------------------------------------------------------------
   const getDeepActiveElement = () => {
     try {
@@ -75,151 +73,81 @@ export default function NoShowCalculator() {
     }
   };
 
-  // ------------------------------------------------------------
-  // Keyboard / VisualViewport -> --kb Padding + defensives Focus-Scrollen
-  // ------------------------------------------------------------
-  useEffect(() => {
-    const isInIframe = typeof window !== "undefined" && window.self !== window.top;
-
-    const vv = window.visualViewport;
-    let cleanupVv = null;
-
-    const getKb = () => {
-      try {
-        if (!vv) return 0;
-        return Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      } catch {
-        return 0;
-      }
-    };
-
-    if (vv) {
-      const updateKb = () => {
-        const kb = getKb();
-        document.documentElement.style.setProperty("--kb", `${kb}px`);
-      };
-      vv.addEventListener("resize", updateKb);
-      vv.addEventListener("scroll", updateKb);
-      updateKb();
-      cleanupVv = () => {
-        vv.removeEventListener("resize", updateKb);
-        vv.removeEventListener("scroll", updateKb);
-      };
-    }
-
-    // Wichtig: NICHT aggressiv scrollIntoView auf Android, nur wenn wirklich verdeckt
-    let onFocusIn;
-    if (!isInIframe) {
-      onFocusIn = (e) => {
-        const el = e.target;
-        if (!el) return;
-        const tag = el.tagName?.toLowerCase();
-        if (!["input", "textarea", "select"].includes(tag)) return;
-
-        const type = el.getAttribute?.("type")?.toLowerCase();
-        if (type === "range") return;
-
-        const kb = getKb();
-        if (!kb) return;
-
-        setTimeout(() => {
-          try {
-            const r = el.getBoundingClientRect();
-            const viewH = vv ? vv.height : window.innerHeight;
-            if (r.bottom > viewH - 12) {
-              el.scrollIntoView({ block: "center", behavior: "smooth" });
-            }
-          } catch {}
-        }, 80);
-      };
-      window.addEventListener("focusin", onFocusIn);
-    }
-
-    return () => {
-      if (onFocusIn) window.removeEventListener("focusin", onFocusIn);
-      if (cleanupVv) cleanupVv();
-    };
-  }, []);
-
-  // ------------------------------------------------------------
-  // Helpers
-  // ------------------------------------------------------------
-  const isKeyboardOpen = () => {
-    try {
-      const vv = window.visualViewport;
-      if (!vv) return false;
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      return kb > 0;
-    } catch {
-      return false;
-    }
-  };
-
   const blurTextInputIfAny = useCallback(() => {
     try {
       const el = getDeepActiveElement();
       if (!el) return;
-
       const tag = el.tagName?.toLowerCase();
       if (!["input", "textarea", "select"].includes(tag)) return;
-
       const type = el.getAttribute?.("type")?.toLowerCase();
-      if (type === "range") return;
-
+      if (type === "range") return; // Slider nicht bluren
       el.blur?.();
     } catch {}
   }, []);
 
-  const toNonNegativeNumberString = (v) => {
-    const n = Number(v);
-    if (!Number.isFinite(n)) return "";
-    return String(Math.max(0, n));
-  };
-
-  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
-
   // ------------------------------------------------------------
-  // FIX: Keyboard “blitzt” beim ersten Tap
-  // -> KEIN globales blur auf pointerdown/touchstart!
-  // -> blur nur beim Scroll (wenn KB offen), damit Slider nicht nach oben springt.
+  // Keyboard / VisualViewport -> --kb Padding (nur Layout, kein Blur!)
   // ------------------------------------------------------------
   useEffect(() => {
-    const onAnyScrollCapture = () => {
-      if (!isKeyboardOpen()) return;
-      // Wenn User scrollt, schließen wir bewusst das Keyboard
-      // (damit späterer Slider-Tap keinen Focus-Restore auslöst)
-      blurTextInputIfAny();
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const updateKb = () => {
+      try {
+        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        document.documentElement.style.setProperty("--kb", `${kb}px`);
+      } catch {}
     };
 
-    document.addEventListener("scroll", onAnyScrollCapture, true);
-    return () => document.removeEventListener("scroll", onAnyScrollCapture, true);
-  }, [blurTextInputIfAny]);
+    vv.addEventListener("resize", updateKb);
+    vv.addEventListener("scroll", updateKb);
+    updateKb();
+
+    return () => {
+      vv.removeEventListener("resize", updateKb);
+      vv.removeEventListener("scroll", updateKb);
+    };
+  }, []);
 
   // ------------------------------------------------------------
-  // Range Interaction: gezielt stabilisieren (Slider)
+  // FIX Samsung/Android:
+  // Slider soll Keyboard schließen, aber Scroll-Position stabil bleiben
+  // (ohne globales blur/pointer-handler -> behebt "2x tippen")
   // ------------------------------------------------------------
+  const getCurrentViewportPositions = () => {
+    const vv = window.visualViewport;
+    return {
+      scrollY: window.scrollY || 0,
+      visualOffsetTop: vv ? vv.offsetTop : 0,
+    };
+  };
+
   const stabilizeRangeStart = useCallback(() => {
     try {
-      const y = window.scrollY || 0;
+      const vv = window.visualViewport;
+      const { scrollY, visualOffsetTop } = getCurrentViewportPositions();
 
+      // Keyboard schließen (nur wenn gerade ein Textinput fokussiert ist)
       blurTextInputIfAny();
 
-      // falls Browser trotzdem kurz korrigiert
-      requestAnimationFrame(() => {
+      const restore = () => {
         try {
-          window.scrollTo({ top: y, behavior: "auto" });
+          const nowOffset = vv ? vv.offsetTop : 0;
+          const diff = nowOffset - visualOffsetTop;
+          window.scrollTo({ top: scrollY + diff, behavior: "auto" });
         } catch {}
-      });
-      setTimeout(() => {
-        try {
-          window.scrollTo({ top: y, behavior: "auto" });
-        } catch {}
-      }, 60);
+      };
+
+      // Mehrere Versuche, weil Chrome den Offset oft verzögert updated
+      requestAnimationFrame(restore);
+      setTimeout(restore, 60);
+      setTimeout(restore, 140);
+      setTimeout(restore, 220);
     } catch {}
   }, [blurTextInputIfAny]);
 
   // ------------------------------------------------------------
-  // Fix #2: Anchor/CTA Klick abfangen (Hero)
+  // Fix #2: Anchor/CTA Klick im Hero abfangen (#no-show-calculator)
   // ------------------------------------------------------------
   useEffect(() => {
     const onDocClickCapture = (e) => {
@@ -231,17 +159,16 @@ export default function NoShowCalculator() {
         const href = a.getAttribute("href") || "";
         if (!href.startsWith("#")) return;
 
-        const id = href.replace("#", "");
-        if (!id) return;
-
-        const allowed = new Set(["no-show-calculator"]);
-        if (!allowed.has(id)) return;
+        const id = href.slice(1);
+        if (id !== "no-show-calculator") return;
 
         const container = wrapperRef.current || document.getElementById("no-show-calculator");
         if (!container) return;
 
         e.preventDefault();
-        blurTextInputIfAny();
+
+        // Kein Blur hier nötig (sonst evtl. Tap-Probleme) – aber sicherheitshalber:
+        // blurTextInputIfAny();
 
         const progressH = progressWrapRef.current?.getBoundingClientRect?.().height || 0;
         const extraOffset = Math.max(48, progressH + 12);
@@ -260,9 +187,9 @@ export default function NoShowCalculator() {
 
     document.addEventListener("click", onDocClickCapture, true);
     return () => document.removeEventListener("click", onDocClickCapture, true);
-  }, [blurTextInputIfAny, scrollToElWithOffset]);
+  }, [scrollToElWithOffset]);
 
-  // Wenn Contact-Form aufgeht: bewusst scrollen
+  // Wenn Contact-Form aufgeht: bewusst scrollen (Progress bleibt sichtbar)
   useEffect(() => {
     if (!showContactForm || !contactFormRef.current) return;
 
@@ -273,54 +200,51 @@ export default function NoShowCalculator() {
   }, [showContactForm, scrollToEmbedTop, scrollToElWithOffset]);
 
   // ------------------------------------------------------------
-  // Plausibilitäts-Caps
-  // - noShowGuestsLast30Days max = reservationsPerDay * 30 * MAX_GUESTS_PER_RES
+  // Input handling + Plausibilität
   // ------------------------------------------------------------
-  const reservationsPerDayNum = Math.max(0, Number(formData.reservationsPerDay || 0));
-  const maxNoShowGuestsCap = reservationsPerDayNum > 0 ? Math.floor(reservationsPerDayNum * 30 * MAX_GUESTS_PER_RES) : 0;
+  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
-  useEffect(() => {
-    // Wenn Reservierungen reduziert werden, clampen wir No-Shows nach unten
-    const current = Number(formData.noShowGuestsLast30Days || 0);
-    if (!Number.isFinite(current)) return;
+  const clampNonNegative = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return v;
+    return String(Math.max(0, n));
+  };
 
-    const clamped = maxNoShowGuestsCap > 0 ? clamp(current, 0, maxNoShowGuestsCap) : 0;
-    if (String(clamped) !== String(formData.noShowGuestsLast30Days || "")) {
-      setFormData((prev) => ({ ...prev, noShowGuestsLast30Days: String(clamped) }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxNoShowGuestsCap]);
+  const getNoShowCap = (reservationsPerDayValue) => {
+    const rpd = Math.max(0, Number(reservationsPerDayValue) || 0);
+    return Math.floor(rpd * DAYS_30 * MAX_GUESTS_PER_RES);
+  };
+
+  const capNoShowGuests30 = (v, reservationsPerDayValue) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return v;
+    const cap = getNoShowCap(reservationsPerDayValue);
+    return String(clamp(Math.max(0, n), 0, cap));
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     let newValue = type === "checkbox" ? checked : value;
 
-    // Negative verhindern
-    const nonNegativeFields = [
-      "reservationsPerDay",
-      "noShowGuestsLast30Days",
-      "openDays",
-      "noShowFee",
-      "restaurantName", // irrelevant, aber harmless
-    ];
-
-    if (type === "number" && ["reservationsPerDay", "noShowGuestsLast30Days", "openDays", "noShowFee"].includes(name)) {
-      newValue = toNonNegativeNumberString(newValue);
+    // numerische Felder: keine Minuswerte
+    const numericFields = ["reservationsPerDay", "noShowGuestsLast30Days", "averageSpend", "noShowFee", "openDays"];
+    if (numericFields.includes(name) && type !== "checkbox") {
+      if (String(newValue) !== "") newValue = clampNonNegative(newValue);
     }
 
-    // openDays clamp 1..7
+    // openDays clamp 1..7 (aber leeren Wert erlauben)
     if (name === "openDays") {
-      const n = Number(newValue);
-      if (Number.isFinite(n)) newValue = String(Math.min(7, Math.max(1, n)));
+      if (String(newValue) === "") {
+        // allow empty
+      } else {
+        const n = Number(newValue);
+        if (Number.isFinite(n)) newValue = String(clamp(n, 1, 7));
+      }
     }
 
     // noShowGuests cap
     if (name === "noShowGuestsLast30Days") {
-      const n = Number(newValue);
-      if (Number.isFinite(n)) {
-        const cap = maxNoShowGuestsCap;
-        newValue = String(cap > 0 ? clamp(n, 0, cap) : 0);
-      }
+      if (String(newValue) !== "") newValue = capNoShowGuests30(newValue, formData.reservationsPerDay);
     }
 
     setFormData((prev) => ({ ...prev, [name]: newValue }));
@@ -350,7 +274,7 @@ export default function NoShowCalculator() {
 
     const errors = {};
     for (const field of requiredByStep[currentStep] || []) {
-      if (!formData[field]) errors[field] = true;
+      if (formData[field] === "" || formData[field] === null || formData[field] === undefined) errors[field] = true;
     }
     setFormErrors((prev) => ({ ...prev, ...errors }));
     return Object.keys(errors).length === 0;
@@ -387,6 +311,9 @@ export default function NoShowCalculator() {
     afterStepChangeScroll();
   };
 
+  // ------------------------------------------------------------
+  // Options
+  // ------------------------------------------------------------
   const reservationToolOptions = [
     "",
     "aleno",
@@ -420,12 +347,14 @@ export default function NoShowCalculator() {
 
   const currency = "€";
 
-  // --- Rechenlogik (30 Tage) ---
-  const reservationsPerDay = Math.max(0, Number(formData.reservationsPerDay || 0));
-  const avgGuestsPerReservation = Math.max(0, Number(formData.avgGuestsPerReservation || 0));
-  const openDaysPerWeek = Math.max(0, Number(formData.openDays || 0));
-  const avgSpendPerGuest = Math.max(0, Number(formData.averageSpend || 0));
-  const noShowGuestsInput30 = Math.max(0, Number(formData.noShowGuestsLast30Days || 0));
+  // ------------------------------------------------------------
+  // Rechenlogik (personenbasiert, 30 Tage)
+  // ------------------------------------------------------------
+  const reservationsPerDay = Math.max(0, +formData.reservationsPerDay || 0);
+  const avgGuestsPerReservation = Math.max(0, +formData.avgGuestsPerReservation || 0);
+  const openDaysPerWeek = Math.max(0, +formData.openDays || 0);
+  const avgSpendPerGuest = Math.max(0, +formData.averageSpend || 0);
+  const noShowGuestsInput30 = Math.max(0, +formData.noShowGuestsLast30Days || 0);
 
   const avgGuestsSliderValue = avgGuestsPerReservation || 2;
   const avgSpendSliderValue = avgSpendPerGuest || 50;
@@ -433,29 +362,30 @@ export default function NoShowCalculator() {
   const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (MAX_GUESTS_PER_RES - 1)) * 100;
   const avgSpendPercent = ((avgSpendSliderValue - 10) / (500 - 10)) * 100;
 
-  const noShowFeePerGuest = formData.feeForNoShow === "Ja" ? Math.max(0, Number(formData.noShowFee || 0)) : 0;
+  const noShowFeePerGuest = formData.feeForNoShow === "Ja" ? Math.max(0, +formData.noShowFee || 0) : 0;
 
-  const OPEN_DAYS_30 = openDaysPerWeek > 0 ? (openDaysPerWeek / 7) * 30 : 0;
+  const OPEN_DAYS_30 = openDaysPerWeek > 0 ? (openDaysPerWeek / 7) * DAYS_30 : 0;
   const totalReservations30 = reservationsPerDay * OPEN_DAYS_30;
   const totalGuests30 = totalReservations30 * avgGuestsPerReservation;
 
-  // Plausibel: No-Shows können nie höher als totalGuests30 sein
+  // ✅ harte Plausibilität: wenn keine Gäste -> keine No-Shows/Loss
   const noShowGuests30 = totalGuests30 > 0 ? Math.min(noShowGuestsInput30, totalGuests30) : 0;
 
   const noShowRate = totalGuests30 > 0 ? (noShowGuests30 / totalGuests30) * 100 : 0;
 
   const totalRevenue30 = totalGuests30 * avgSpendPerGuest;
-
-  // WICHTIG: wenn keine Gäste/Reservierungen -> Verlust 0
   const grossLoss30 = totalGuests30 > 0 ? noShowGuests30 * avgSpendPerGuest : 0;
   const recoveredByFees30 = totalGuests30 > 0 ? noShowGuests30 * noShowFeePerGuest : 0;
-  const loss30 = Math.max(grossLoss30 - recoveredByFees30, 0);
+  const loss30 = totalGuests30 > 0 ? Math.max(grossLoss30 - recoveredByFees30, 0) : 0;
 
   const upsell = totalRevenue30 * 0.05;
   const roi = Math.floor((loss30 + upsell) / 350);
 
   const format = (val) => Math.round(val).toLocaleString("de-DE");
 
+  // ------------------------------------------------------------
+  // Email validation
+  // ------------------------------------------------------------
   const isBusinessEmail = (email) => {
     const freeDomains = [
       "gmail.com",
@@ -474,10 +404,7 @@ export default function NoShowCalculator() {
       "protonmail.com",
       "aol.com",
     ];
-    const match = String(email || "")
-      .trim()
-      .toLowerCase()
-      .match(/@([^@]+)$/);
+    const match = String(email || "").trim().toLowerCase().match(/@([^@]+)$/);
     if (!match) return false;
     return !freeDomains.includes(match[1]);
   };
@@ -540,12 +467,16 @@ export default function NoShowCalculator() {
     }
   };
 
+  // ------------------------------------------------------------
   // Progress
+  // ------------------------------------------------------------
   const totalSteps = 4;
   const currentStepForProgress = showResult ? 4 : step;
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
 
-  // --- Styles ---
+  // ------------------------------------------------------------
+  // Styles
+  // ------------------------------------------------------------
   const S = {
     wrapper: {
       maxWidth: 650,
@@ -673,6 +604,11 @@ export default function NoShowCalculator() {
 
   const pinkRangeStyle = { width: "100%", accentColor: "#ec4899" };
 
+  const maxNoShowInputHint = getNoShowCap(formData.reservationsPerDay);
+
+  // ------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------
   return (
     <div id="no-show-calculator" ref={wrapperRef} style={S.wrapper}>
       <style>{S.grid2Media}</style>
@@ -693,13 +629,14 @@ export default function NoShowCalculator() {
           <h2 style={S.h2}>Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
           <p style={S.p}>Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.</p>
 
+          {/* 1 */}
           <div style={S.field}>
             <label style={S.label}>Ø Reservierungen pro Öffnungstag (alle Kanäle, z. B. 40)</label>
             <input
               name="reservationsPerDay"
               type="number"
-              min={0}
               inputMode="numeric"
+              min={0}
               value={formData.reservationsPerDay}
               onChange={handleChange}
               style={S.input(!!formErrors.reservationsPerDay)}
@@ -711,10 +648,9 @@ export default function NoShowCalculator() {
             </p>
           </div>
 
+          {/* 2 Slider Gäste */}
           <div style={{ marginBottom: 32 }}>
-            <label style={{ ...S.label, marginBottom: 14 }}>
-              Ø Gäste pro Reservierung (max. {MAX_GUESTS_PER_RES})
-            </label>
+            <label style={{ ...S.label, marginBottom: 14 }}>Ø Gäste pro Reservierung (max. {MAX_GUESTS_PER_RES})</label>
 
             <div style={{ position: "relative", width: "100%" }}>
               <div
@@ -753,6 +689,7 @@ export default function NoShowCalculator() {
             {formErrors.avgGuestsPerReservation && <p style={S.error}>Bitte ausfüllen.</p>}
           </div>
 
+          {/* 3 */}
           <div style={S.field}>
             <label style={S.label}>
               Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung ohne rechtzeitige Absage nicht erschienen? (Schätzung)
@@ -760,17 +697,16 @@ export default function NoShowCalculator() {
             <input
               name="noShowGuestsLast30Days"
               type="number"
-              min={0}
-              max={maxNoShowGuestsCap || 0}
               inputMode="numeric"
+              min={0}
+              max={maxNoShowInputHint}
               value={formData.noShowGuestsLast30Days}
               onChange={handleChange}
               style={S.input(!!formErrors.noShowGuestsLast30Days)}
             />
             {formErrors.noShowGuestsLast30Days && <p style={S.error}>Bitte ausfüllen.</p>}
             <p style={S.helper}>
-              Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen. Maximal möglich (aus Frage 1):{" "}
-              <strong>{maxNoShowGuestsCap.toLocaleString("de-DE")}</strong>
+              Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen. (Max. aktuell: {maxNoShowInputHint})
             </p>
           </div>
 
@@ -793,6 +729,7 @@ export default function NoShowCalculator() {
             inputMode: "numeric",
           })}
 
+          {/* Slider Umsatz */}
           <div style={{ marginBottom: 32 }}>
             <label style={{ ...S.label, marginBottom: 14 }}>Ø Umsatz pro Gast ({currency})</label>
 
@@ -856,10 +793,7 @@ export default function NoShowCalculator() {
           {renderField("feeForNoShow", "Werden No-Show-Gebühren erhoben?", "text", ["", "Ja", "Nein"])}
 
           {formData.feeForNoShow === "Ja" &&
-            renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number", null, {
-              min: 0,
-              inputMode: "numeric",
-            })}
+            renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number", null, { min: 0, inputMode: "numeric" })}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
             <button type="button" onClick={() => (setStep(2), afterStepChangeScroll())} style={S.btnSecondary}>
@@ -900,7 +834,6 @@ export default function NoShowCalculator() {
               <button
                 type="button"
                 onClick={() => {
-                  blurTextInputIfAny();
                   setShowContactForm(true);
                 }}
                 style={S.btnPrimary}
