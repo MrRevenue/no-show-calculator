@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function NoShowCalculator() {
   const [step, setStep] = useState(1);
@@ -28,46 +28,27 @@ export default function NoShowCalculator() {
   const [submissionStatus, setSubmissionStatus] = useState(null); // 'submitting' | 'success' | 'error' | null
   const [showForm, setShowForm] = useState(true);
   const [emailError, setEmailError] = useState("");
-
-  const topRef = useRef(null);
   const contactFormRef = useRef(null);
 
-  // --- Helper: scrollt die Seite so, dass das Formular oben sauber sichtbar ist (inkl. Offset für Header) ---
-  const scrollToTop = (behavior = "smooth") => {
-    const el = topRef.current;
-    if (!el) return;
+  // ------------------------------------------------------------
+  // Scroll helper: zuverlässig im HubSpot-Kontext (Sticky Header)
+  // ------------------------------------------------------------
+  const scrollToEmbedTop = (behavior = "smooth") => {
+    try {
+      const container = document.getElementById("no-show-calculator");
+      if (!container) return;
 
-    // Offset: Header / Sticky Nav – bei aleno typischerweise ~80-110px
-    const headerOffset = window.innerWidth < 768 ? 80 : 110;
+      // HubSpot hat oft einen sticky header -> Offset
+      const HEADER_OFFSET = 110;
 
-    // Warten, bis DOM nach Step-Wechsel wirklich gerendert ist
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const rect = el.getBoundingClientRect();
-        const y = rect.top + window.pageYOffset - headerOffset;
-        window.scrollTo({ top: Math.max(0, y), behavior });
-      });
-    });
+      const rect = container.getBoundingClientRect();
+      const targetY = Math.max(0, window.scrollY + rect.top - HEADER_OFFSET);
+
+      window.scrollTo({ top: targetY, behavior });
+    } catch {}
   };
 
-  /**
-   * ✅ Fix 1: Reload-Jump nach unten verhindern
-   * - Wenn ein Hash wie #no-show-calculator in der URL bleibt, scrollt der Browser beim Reload dahin.
-   * - Wir entfernen den Hash nach dem Mount (ohne Reload).
-   */
-  useEffect(() => {
-    try {
-      if (window.location.hash && window.location.hash.toLowerCase() === "#no-show-calculator") {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
-    } catch {}
-  }, []);
-
-  /**
-   * ✅ Keyboard / iFrame / Shadow: stabilisieren
-   * - VisualViewport: nur kb-padding als CSS var --kb
-   * - Kein globales focusin-scrollIntoView im iFrame
-   */
+  // Keyboard / VisualViewport (kb-padding via --kb)
   useEffect(() => {
     const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
@@ -78,7 +59,6 @@ export default function NoShowCalculator() {
         if (!el) return;
         const tag = el.tagName?.toLowerCase();
         if (!["input", "textarea", "select"].includes(tag)) return;
-
         setTimeout(() => {
           try {
             el.scrollIntoView({ block: "nearest" });
@@ -106,18 +86,28 @@ export default function NoShowCalculator() {
     };
   }, []);
 
+  // Wenn Contact-Form aufgeht: bewusst scrollen (CTA)
   useEffect(() => {
     if (showContactForm && contactFormRef.current) {
-      // CTA: bewusst scrollen
-      scrollToTop("smooth");
-      contactFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      // erst zum Embed-Top (damit Progress sichtbar bleibt), dann zum Formular
+      scrollToEmbedTop("smooth");
+      setTimeout(() => {
+        try {
+          contactFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch {}
+      }, 150);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showContactForm]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const newValue = type === "checkbox" ? checked : value;
+    let newValue = type === "checkbox" ? checked : value;
+
+    // ✅ openDays clamp auf 1..7
+    if (name === "openDays") {
+      const n = Number(newValue);
+      if (Number.isFinite(n)) newValue = String(Math.min(7, Math.max(1, n)));
+    }
 
     setFormData((prev) => ({ ...prev, [name]: newValue }));
     setFormErrors((prev) => ({ ...prev, [name]: false }));
@@ -140,11 +130,7 @@ export default function NoShowCalculator() {
       2: ["restaurantType", "openDays", "averageSpend", "hasOnlineReservation"],
       3:
         formData.hasOnlineReservation === "Ja"
-          ? [
-              "reservationTool",
-              "feeForNoShow",
-              ...(formData.feeForNoShow === "Ja" ? ["noShowFee"] : []),
-            ]
+          ? ["reservationTool", "feeForNoShow", ...(formData.feeForNoShow === "Ja" ? ["noShowFee"] : [])]
           : [],
     };
 
@@ -156,25 +142,37 @@ export default function NoShowCalculator() {
     return Object.keys(errors).length === 0;
   };
 
+  // ✅ Nach Step-Wechsel: nach oben (inkl. Progressbar)
+  const afterStepChangeScroll = () => {
+    // 2 RAFs = deutlich stabiler bei HubSpot Layout/Fonts
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToEmbedTop("smooth");
+      });
+    });
+  };
+
   const goFromStep1 = () => {
     if (!validateStep(1)) return;
     setStep(2);
-    scrollToTop("smooth");
+    afterStepChangeScroll();
   };
 
   const goFromStep2 = () => {
     if (!validateStep(2)) return;
 
-    if (formData.hasOnlineReservation === "Ja") setStep(3);
-    else setShowResult(true);
-
-    scrollToTop("smooth");
+    if (formData.hasOnlineReservation === "Ja") {
+      setStep(3);
+    } else {
+      setShowResult(true);
+    }
+    afterStepChangeScroll();
   };
 
   const goFromStep3 = () => {
     if (!validateStep(3)) return;
     setShowResult(true);
-    scrollToTop("smooth");
+    afterStepChangeScroll();
   };
 
   const reservationToolOptions = [
@@ -274,9 +272,7 @@ export default function NoShowCalculator() {
     }
 
     if (!isBusinessEmail(formData.email)) {
-      setEmailError(
-        "Bitte gib eine geschäftliche E-Mail-Adresse an (keine Freemailer wie gmail.com, gmx.de etc.)."
-      );
+      setEmailError("Bitte gib eine geschäftliche E-Mail-Adresse an (keine Freemailer wie gmail.com, gmx.de etc.).");
       return;
     }
 
@@ -320,176 +316,123 @@ export default function NoShowCalculator() {
     }
   };
 
-  // Progress
+  // Fortschrittsbalken
   const totalSteps = 4;
   const currentStepForProgress = showResult ? 4 : step;
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
 
-  // --- Styles (Embed-robust) ---
-  const S = useMemo(() => {
-    return {
-      wrapper: {
-        maxWidth: 650,
-        margin: "0 auto",
-        padding: "24px",
-        paddingBottom: "calc(var(--kb, 0px) + 24px)",
-        color: "#111827",
-        fontFamily:
-          "Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji",
-      },
+  // --- Styles ---
+  const S = {
+    wrapper: {
+      maxWidth: 650,
+      margin: "0 auto",
+      padding: "24px",
+      paddingBottom: "calc(var(--kb, 0px) + 24px)",
+      color: "#111827",
+    },
 
-      // H2 wie Landingpages: leichter, groß, clean
-      h2: {
-        fontSize: 40,
-        lineHeight: 1.05,
-        margin: "8px 0 12px 0",
-        fontWeight: 300,
-        letterSpacing: "-0.02em",
-        color: "#0f172a",
-      },
-      h2Small: { fontSize: 22, lineHeight: 1.2, margin: "0 0 14px 0", fontWeight: 600, color: "#0f172a" },
+    h2: { fontSize: 32, lineHeight: 1.15, margin: "8px 0 10px 0", fontWeight: 300 },
+    h2Small: { fontSize: 22, lineHeight: 1.2, margin: "0 0 14px 0", fontWeight: 600 },
+    p: { fontSize: 15, lineHeight: 1.45, color: "#4b5563", margin: "0 0 16px 0" },
 
-      p: { fontSize: 15, lineHeight: 1.55, color: "#475569", margin: "0 0 18px 0" },
+    label: { display: "block", fontSize: 14, fontWeight: 600, color: "#374151", margin: "0 0 6px 0" },
+    helper: { fontSize: 12, color: "#6b7280", marginTop: 6 },
+    error: { fontSize: 12, color: "#ec4899", marginTop: 6 },
 
-      label: { display: "block", fontSize: 14, fontWeight: 600, color: "#0f172a", margin: "0 0 6px 0" },
-      helper: { fontSize: 12.5, color: "#64748b", marginTop: 8, lineHeight: 1.4 },
-      error: { fontSize: 12.5, color: "#ec4899", marginTop: 8 },
+    field: { marginBottom: 28 },
 
-      field: { marginBottom: 26 },
+    input: (isError) => ({
+      width: "100%",
+      fontSize: 16,
+      lineHeight: 1.25,
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: `1px solid ${isError ? "#ec4899" : "#d1d5db"}`,
+      outline: "none",
+      background: "#fff",
+      color: "inherit",
+    }),
 
-      input: (isError) => ({
-        width: "100%",
-        fontSize: 16,
-        lineHeight: 1.25,
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: `1px solid ${isError ? "#ec4899" : "#cbd5e1"}`,
-        outline: "none",
-        background: "#fff",
-        color: "#0f172a",
-      }),
+    select: (isError) => ({
+      width: "100%",
+      fontSize: 16,
+      lineHeight: 1.25,
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: `1px solid ${isError ? "#ec4899" : "#d1d5db"}`,
+      background: "#fff",
+      color: "inherit",
+    }),
 
-      select: (isError) => ({
-        width: "100%",
-        fontSize: 16,
-        lineHeight: 1.25,
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: `1px solid ${isError ? "#ec4899" : "#cbd5e1"}`,
-        background: "#fff",
-        color: "#0f172a",
-      }),
+    btnPrimary: {
+      backgroundColor: "#fe4497",
+      border: "2px solid transparent",
+      borderRadius: 999,
+      color: "#fff",
+      fontFamily: "Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+      fontSize: 14,
+      fontWeight: 600,
+      padding: "14px 38px",
+      textTransform: "uppercase",
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
 
-      btnPrimary: {
-        backgroundColor: "#fe4497",
-        border: "2px solid transparent",
-        borderRadius: 999,
-        color: "#fff",
-        fontFamily: "inherit",
-        fontSize: 14,
-        fontWeight: 600,
-        padding: "14px 44px",
-        textTransform: "uppercase",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-      },
+    btnSecondary: {
+      backgroundColor: "#e5e7eb",
+      border: "2px solid transparent",
+      borderRadius: 999,
+      color: "#111827",
+      fontFamily: "Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+      fontSize: 14,
+      fontWeight: 600,
+      padding: "10px 18px",
+      cursor: "pointer",
+    },
 
-      btnSecondary: {
-        backgroundColor: "#e2e8f0",
-        border: "2px solid transparent",
-        borderRadius: 999,
-        color: "#0f172a",
-        fontFamily: "inherit",
-        fontSize: 14,
-        fontWeight: 600,
-        padding: "10px 18px",
-        cursor: "pointer",
-      },
+    progressWrap: { marginBottom: 18 },
+    progressTrack: { width: "100%", height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden" },
+    progressFill: { height: "100%", background: "#ec4899", width: `${progressPercent}%`, transition: "width 250ms ease" },
+    progressText: { marginTop: 6, fontSize: 12, color: "#6b7280", textAlign: "right" },
 
-      btnGreen: {
-        backgroundColor: "#16a34a",
-        border: "2px solid transparent",
-        borderRadius: 999,
-        color: "#fff",
-        fontFamily: "inherit",
-        fontSize: 14,
-        fontWeight: 700,
-        padding: "10px 18px",
-        cursor: "pointer",
-      },
+    grid2: {
+      display: "grid",
+      gridTemplateColumns: "1fr",
+      gap: 14,
+    },
 
-      progressWrap: { marginBottom: 18 },
-      progressTrack: { width: "100%", height: 8, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" },
-      progressFill: { height: "100%", background: "#ec4899", width: `${progressPercent}%`, transition: "width 250ms ease" },
-      progressText: { marginTop: 6, fontSize: 12, color: "#64748b", textAlign: "right" },
+    card: {
+      background: "#111",
+      color: "#fff",
+      padding: 22,
+      borderRadius: 16,
+      textAlign: "center",
+    },
 
-      grid2: { display: "grid", gridTemplateColumns: "1fr", gap: 14 },
-      card: { background: "#111", color: "#fff", padding: 22, borderRadius: 18, textAlign: "center" },
-      cardTitle: { fontSize: 12.5, opacity: 0.9, margin: "0 0 8px 0" },
-      // ✅ KPI-Zahlen explizit weiß
-      cardValue: { fontSize: 36, fontWeight: 800, margin: 0, color: "#ffffff" },
+    cardTitle: { fontSize: 12, opacity: 0.9, margin: "0 0 6px 0", color: "#fff" },
+    cardValue: { fontSize: 32, fontWeight: 800, margin: 0, color: "#fff" }, // ✅ KPI immer weiß
 
-      grid2Media: `
-        @media (min-width: 640px) { .ns-grid-2 { grid-template-columns: 1fr 1fr; } }
-      `,
-    };
-  }, [progressPercent]);
+    grid2Media: `
+      @media (min-width: 640px) {
+        .ns-grid-2 { grid-template-columns: 1fr 1fr; }
+      }
+    `,
+  };
 
-  // Slider CSS direkt im Component (Shadow-safe)
-  const sliderCss = `
-    input.pink-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 6px;              /* ✅ dünner */
-      border-radius: 999px;
-      background: #f9a8d4;
-      outline: none;
-      cursor: pointer;
-    }
-
-    input.pink-slider::-webkit-slider-runnable-track {
-      height: 6px;              /* ✅ dünner */
-      border-radius: 999px;
-      background: #f9a8d4;
-    }
-
-    input.pink-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      background: #ec4899;
-      border: 3px solid #fff;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      margin-top: -6px;         /* ✅ zentriert auf dünner Track */
-    }
-
-    input.pink-slider::-moz-range-track {
-      height: 6px;
-      border-radius: 999px;
-      background: #f9a8d4;
-    }
-
-    input.pink-slider::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      background: #ec4899;
-      border: 3px solid #fff;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-    }
-  `;
-
-  const renderField = (field, label, type = "text", options = null) => (
+  const renderField = (field, label, type = "text", options = null, extraProps = {}) => (
     <div key={field} style={S.field}>
       <label style={S.label}>{label}</label>
       {options ? (
-        <select name={field} value={formData[field]} onChange={handleChange} style={S.select(!!formErrors[field])}>
+        <select
+          name={field}
+          value={formData[field]}
+          onChange={handleChange}
+          style={S.select(!!formErrors[field])}
+          {...extraProps}
+        >
           {options.map((opt, i) => (
             <option key={i} value={opt}>
               {opt || "Bitte wählen"}
@@ -503,6 +446,7 @@ export default function NoShowCalculator() {
           value={formData[field]}
           onChange={handleChange}
           style={S.input(!!formErrors[field])}
+          {...extraProps}
         />
       )}
       {formErrors[field] && <p style={S.error}>Bitte ausfüllen.</p>}
@@ -512,10 +456,6 @@ export default function NoShowCalculator() {
   return (
     <div style={S.wrapper}>
       <style>{S.grid2Media}</style>
-      <style>{sliderCss}</style>
-
-      {/* Scroll-Anker */}
-      <div ref={topRef} />
 
       {/* Progress */}
       <div style={S.progressWrap}>
@@ -531,10 +471,9 @@ export default function NoShowCalculator() {
       {!showResult && step === 1 && (
         <>
           <h2 style={S.h2}>Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
-          <p style={S.p}>
-            Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.
-          </p>
+          <p style={S.p}>Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.</p>
 
+          {/* 1 */}
           <div style={S.field}>
             <label style={S.label}>Ø Reservierungen pro Öffnungstag (alle Kanäle, z. B. 40)</label>
             <input
@@ -546,20 +485,20 @@ export default function NoShowCalculator() {
             />
             {formErrors.reservationsPerDay && <p style={S.error}>Bitte ausfüllen.</p>}
             <p style={S.helper}>
-              Wie viele Reservierungen (also nicht Anzahl Gäste) hast du an einem typischen Öffnungstag im Durchschnitt –
-              egal ob online, telefonisch oder per E-Mail?
+              Wie viele Reservierungen (also nicht Anzahl Gäste) hast du an einem typischen Öffnungstag im Durchschnitt – egal ob online,
+              telefonisch oder per E-Mail?
             </p>
           </div>
 
-          {/* Slider Gäste */}
-          <div style={{ marginBottom: 30 }}>
+          {/* 2 Slider Gäste */}
+          <div style={{ marginBottom: 32 }}>
             <label style={{ ...S.label, marginBottom: 14 }}>Ø Gäste pro Reservierung (z. B. 2,0 Personen)</label>
 
             <div style={{ position: "relative", width: "100%" }}>
               <div
                 style={{
                   position: "absolute",
-                  top: -20,
+                  top: -18,
                   left: `${avgGuestsPercent}%`,
                   transform: "translateX(-50%)",
                   fontSize: 12,
@@ -581,6 +520,7 @@ export default function NoShowCalculator() {
                 value={avgGuestsSliderValue}
                 onChange={handleChange}
                 className="pink-slider"
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -588,10 +528,10 @@ export default function NoShowCalculator() {
             {formErrors.avgGuestsPerReservation && <p style={S.error}>Bitte ausfüllen.</p>}
           </div>
 
+          {/* 3 */}
           <div style={S.field}>
             <label style={S.label}>
-              Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung ohne rechtzeitige Absage nicht erschienen?
-              (Schätzung)
+              Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung ohne rechtzeitige Absage nicht erschienen? (Schätzung)
             </label>
             <input
               name="noShowGuestsLast30Days"
@@ -616,16 +556,23 @@ export default function NoShowCalculator() {
           <h2 style={S.h2Small}>Angaben zu deinem Restaurant</h2>
 
           {renderField("restaurantType", "Um welche Art von Restaurant handelt es sich?", "text", restaurantTypeOptions)}
-          {renderField("openDays", "Anzahl Tage pro Woche geöffnet (z. B. 5)", "number")}
 
-          <div style={{ marginBottom: 30 }}>
+          {/* ✅ openDays min/max */}
+          {renderField("openDays", "Anzahl Tage pro Woche geöffnet (z. B. 5)", "number", null, {
+            min: 1,
+            max: 7,
+            inputMode: "numeric",
+          })}
+
+          {/* Slider Umsatz */}
+          <div style={{ marginBottom: 32 }}>
             <label style={{ ...S.label, marginBottom: 14 }}>Ø Umsatz pro Gast ({currency})</label>
 
             <div style={{ position: "relative", width: "100%" }}>
               <div
                 style={{
                   position: "absolute",
-                  top: -20,
+                  top: -18,
                   left: `${avgSpendPercent}%`,
                   transform: "translateX(-50%)",
                   fontSize: 12,
@@ -647,6 +594,7 @@ export default function NoShowCalculator() {
                 value={avgSpendSliderValue}
                 onChange={handleChange}
                 className="pink-slider"
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -662,7 +610,7 @@ export default function NoShowCalculator() {
           )}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button type="button" onClick={() => { setStep(1); scrollToTop("smooth"); }} style={S.btnSecondary}>
+            <button type="button" onClick={() => (setStep(1), afterStepChangeScroll())} style={S.btnSecondary}>
               Zurück
             </button>
             <button type="button" onClick={goFromStep2} style={S.btnPrimary}>
@@ -678,16 +626,19 @@ export default function NoShowCalculator() {
           <h2 style={S.h2Small}>Details zum Reservierungssystem</h2>
 
           {renderField("reservationTool", "Welches Reservierungssystem ist aktuell im Einsatz?", "text", reservationToolOptions)}
+
           {renderField("feeForNoShow", "Werden No-Show-Gebühren erhoben?", "text", ["", "Ja", "Nein"])}
 
           {formData.feeForNoShow === "Ja" &&
             renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number")}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button type="button" onClick={() => { setStep(2); scrollToTop("smooth"); }} style={S.btnSecondary}>
+            <button type="button" onClick={() => (setStep(2), afterStepChangeScroll())} style={S.btnSecondary}>
               Zurück
             </button>
-            <button type="button" onClick={goFromStep3} style={S.btnGreen}>
+
+            {/* ✅ nicht grün -> pink */}
+            <button type="button" onClick={goFromStep3} style={S.btnPrimary}>
               Auswertung anzeigen
             </button>
           </div>
@@ -697,7 +648,7 @@ export default function NoShowCalculator() {
       {/* RESULT */}
       {showResult && (
         <>
-          <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 30, marginTop: 8, fontWeight: 700 }}>
+          <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 28, marginTop: 8, fontWeight: 700 }}>
             Deine Auswertung
           </h2>
 
@@ -717,15 +668,11 @@ export default function NoShowCalculator() {
 
           {showForm && (
             <div style={{ textAlign: "center", marginTop: 10 }}>
-              <p style={{ margin: "0 0 14px 0", fontWeight: 600, color: "#0f172a", lineHeight: 1.35 }}>
+              <p style={{ margin: "0 0 14px 0", fontWeight: 600, color: "#111827" }}>
                 Möchtest du eine detaillierte Auswertung als PDF inkl. konkreter Handlungsempfehlungen für dein Restaurant erhalten?
               </p>
 
-              <button
-                type="button"
-                onClick={() => { setShowContactForm(true); }}
-                style={{ ...S.btnPrimary, width: "100%", maxWidth: 520 }}
-              >
+              <button type="button" onClick={() => setShowContactForm(true)} style={S.btnPrimary}>
                 Ja, PDF-Report erhalten
               </button>
             </div>
@@ -735,7 +682,7 @@ export default function NoShowCalculator() {
             <form
               ref={contactFormRef}
               onSubmit={handleSubmit}
-              style={{ marginTop: 22, borderTop: "1px solid #e2e8f0", paddingTop: 18 }}
+              style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18 }}
             >
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
                 <input name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Vorname" style={S.input(false)} required />
@@ -744,12 +691,27 @@ export default function NoShowCalculator() {
 
               <div style={{ height: 12 }} />
 
-              <input name="restaurantName" value={formData.restaurantName} onChange={handleChange} placeholder="Name des Restaurants" style={S.input(false)} required />
+              <input
+                name="restaurantName"
+                value={formData.restaurantName}
+                onChange={handleChange}
+                placeholder="Name des Restaurants"
+                style={S.input(false)}
+                required
+              />
 
               <div style={{ height: 12 }} />
 
               <div>
-                <input name="email" value={formData.email} onChange={handleChange} type="email" placeholder="Business-E-Mail-Adresse" style={S.input(false)} required />
+                <input
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  type="email"
+                  placeholder="Business-E-Mail-Adresse"
+                  style={S.input(false)}
+                  required
+                />
                 {emailError && <p style={{ marginTop: 8, color: "#dc2626", fontSize: 13 }}>{emailError}</p>}
               </div>
 
@@ -765,7 +727,7 @@ export default function NoShowCalculator() {
                   }}
                   style={{ marginTop: 3 }}
                 />
-                <label htmlFor="policy" style={{ fontSize: 13, color: "#334155", lineHeight: 1.4 }}>
+                <label htmlFor="policy" style={{ fontSize: 13, color: "#374151", lineHeight: 1.4 }}>
                   Ich bin mit der Verarbeitung meiner Daten und der Zusendung des Reports per E-Mail einverstanden und habe die{" "}
                   <a href="https://www.aleno.me/de/datenschutz" target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
                     Datenschutzerklärung
@@ -786,16 +748,23 @@ export default function NoShowCalculator() {
                 </button>
 
                 {submissionStatus === "error" && (
-                  <p style={{ marginTop: 10, color: "#dc2626", fontSize: 13 }}>
-                    Fehler beim Senden. Bitte versuche es später erneut.
-                  </p>
+                  <p style={{ marginTop: 10, color: "#dc2626", fontSize: 13 }}>Fehler beim Senden. Bitte versuche es später erneut.</p>
                 )}
               </div>
             </form>
           )}
 
           {submissionSuccess && (
-            <div style={{ textAlign: "center", background: "#dcfce7", border: "1px solid #86efac", padding: 18, borderRadius: 16, marginTop: 16 }}>
+            <div
+              style={{
+                textAlign: "center",
+                background: "#dcfce7",
+                border: "1px solid #86efac",
+                padding: 18,
+                borderRadius: 16,
+                marginTop: 16,
+              }}
+            >
               <h2 style={{ margin: "0 0 6px 0", fontSize: 18, fontWeight: 800, color: "#166534" }}>Vielen Dank!</h2>
               <p style={{ margin: 0, color: "#166534" }}>Dein No-Show-Report wurde erfolgreich per E-Mail versendet.</p>
             </div>
