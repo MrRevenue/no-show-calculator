@@ -126,8 +126,19 @@ export default function NoShowCalculator() {
   }, []);
 
   // ------------------------------------------------------------
-  // Blur helper (nur Text/Select/Textarea; NICHT range)
+  // Helpers: keyboard offen?
   // ------------------------------------------------------------
+  const isKeyboardOpen = () => {
+    try {
+      const vv = window.visualViewport;
+      if (!vv) return false;
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      return kb > 0;
+    } catch {
+      return false;
+    }
+  };
+
   const blurTextInputIfAny = useCallback(() => {
     try {
       const el = document.activeElement;
@@ -144,8 +155,69 @@ export default function NoShowCalculator() {
   }, []);
 
   // ------------------------------------------------------------
-  // Fix #3 (robust): Range-Interaktion stabilisieren (iOS Jump verhindern)
-  // Merkt scrollY, blurt Fokus, setzt Scroll danach wieder zurück (RAF + Timeout)
+  // FIX #3 (HARDENED):
+  // Wenn Keyboard offen + User beginnt zu scrollen (touchmove/pointermove),
+  // blur sofort (vor iOS "focus restore" / auto-scroll).
+  // Zusätzlich: wenn User irgendwo tippt (touchstart) außerhalb eines Inputs -> blur.
+  // ------------------------------------------------------------
+  useEffect(() => {
+    const shouldBlurForEvent = (e) => {
+      if (!isKeyboardOpen()) return false;
+
+      const el = document.activeElement;
+      if (!el) return false;
+
+      const tag = el.tagName?.toLowerCase();
+      if (!["input", "textarea", "select"].includes(tag)) return false;
+
+      const type = el.getAttribute?.("type")?.toLowerCase();
+      if (type === "range") return false;
+
+      // Wenn User direkt in ein anderes Input tippt, NICHT blur (sonst nervig)
+      const target = e?.target;
+      const tTag = target?.tagName?.toLowerCase?.();
+      if (tTag && ["input", "textarea", "select"].includes(tTag)) return false;
+
+      return true;
+    };
+
+    const onTouchMove = (e) => {
+      if (!shouldBlurForEvent(e)) return;
+      blurTextInputIfAny();
+    };
+
+    const onPointerMove = (e) => {
+      if (!shouldBlurForEvent(e)) return;
+      blurTextInputIfAny();
+    };
+
+    const onWheel = (e) => {
+      if (!shouldBlurForEvent(e)) return;
+      blurTextInputIfAny();
+    };
+
+    const onTouchStart = (e) => {
+      // Beim ersten Tap irgendwo außerhalb Inputs -> blur (damit Slider-Touch nicht hochzieht)
+      if (!shouldBlurForEvent(e)) return;
+      blurTextInputIfAny();
+    };
+
+    // capture = früher dran als bubbling (wichtig für iOS)
+    window.addEventListener("touchmove", onTouchMove, { passive: true, capture: true });
+    window.addEventListener("pointermove", onPointerMove, { passive: true, capture: true });
+    window.addEventListener("wheel", onWheel, { passive: true, capture: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
+
+    return () => {
+      window.removeEventListener("touchmove", onTouchMove, true);
+      window.removeEventListener("pointermove", onPointerMove, true);
+      window.removeEventListener("wheel", onWheel, true);
+      window.removeEventListener("touchstart", onTouchStart, true);
+    };
+  }, [blurTextInputIfAny]);
+
+  // ------------------------------------------------------------
+  // Range Interaction: zusätzlich stabilisieren (falls iOS trotzdem kurz springt)
   // ------------------------------------------------------------
   const stabilizeRangeStart = useCallback(() => {
     try {
@@ -153,7 +225,6 @@ export default function NoShowCalculator() {
 
       blurTextInputIfAny();
 
-      // iOS "zieht" manchmal sofort hoch -> wir klemmen es wieder fest
       requestAnimationFrame(() => {
         try {
           window.scrollTo({ top: y, behavior: "auto" });
@@ -169,16 +240,13 @@ export default function NoShowCalculator() {
   }, [blurTextInputIfAny]);
 
   // ------------------------------------------------------------
-  // Fix #2 (robust): HubSpot Hero-CTA / Anchor scrollt oft ohne hashchange
-  // -> Klick auf Anker abfangen, Default verhindern, selbst sauber scrollen
+  // Fix #2: Anchor/CTA Klick abfangen (Hero)
   // ------------------------------------------------------------
   useEffect(() => {
     const onDocClickCapture = (e) => {
       try {
         const target = e.target;
-        if (!target) return;
-
-        const a = target.closest?.("a[href^='#']");
+        const a = target?.closest?.("a[href^='#']");
         if (!a) return;
 
         const href = a.getAttribute("href") || "";
@@ -187,25 +255,18 @@ export default function NoShowCalculator() {
         const id = href.replace("#", "");
         if (!id) return;
 
-        // wenn du weitere IDs hast (z.B. "#calculator"), hier ergänzen:
         const allowed = new Set(["no-show-calculator"]);
         if (!allowed.has(id)) return;
 
         const container = wrapperRef.current || document.getElementById("no-show-calculator");
         if (!container) return;
 
-        // Default-Anchor-Scroll verhindern (sonst landet man zu tief)
         e.preventDefault();
-
-        // Fokus raus (Mobile)
         blurTextInputIfAny();
 
-        // Offset so, dass Progress sichtbar bleibt:
         const progressH = progressWrapRef.current?.getBoundingClientRect?.().height || 0;
         const extraOffset = Math.max(48, progressH + 12);
 
-        // Optional: Hash trotzdem setzen (für URL/Back Button)
-        // (ohne nochmal scrollen zu triggern)
         try {
           history.replaceState(null, "", `#${id}`);
         } catch {}
@@ -222,7 +283,7 @@ export default function NoShowCalculator() {
     return () => document.removeEventListener("click", onDocClickCapture, true);
   }, [blurTextInputIfAny, scrollToElWithOffset]);
 
-  // Wenn Contact-Form aufgeht: bewusst scrollen (CTA)
+  // Wenn Contact-Form aufgeht: bewusst scrollen
   useEffect(() => {
     if (!showContactForm || !contactFormRef.current) return;
 
@@ -339,7 +400,7 @@ export default function NoShowCalculator() {
 
   const currency = "€";
 
-  // --- Rechenlogik (personenbasiert, 30 Tage) ---
+  // --- Rechenlogik ---
   const reservationsPerDay = +formData.reservationsPerDay || 0;
   const avgGuestsPerReservation = +formData.avgGuestsPerReservation || 0;
   const openDaysPerWeek = +formData.openDays || 0;
@@ -563,13 +624,7 @@ export default function NoShowCalculator() {
     <div key={field} style={S.field}>
       <label style={S.label}>{label}</label>
       {options ? (
-        <select
-          name={field}
-          value={formData[field]}
-          onChange={handleChange}
-          style={S.select(!!formErrors[field])}
-          {...extraProps}
-        >
+        <select name={field} value={formData[field]} onChange={handleChange} style={S.select(!!formErrors[field])} {...extraProps}>
           {options.map((opt, i) => (
             <option key={i} value={opt}>
               {opt || "Bitte wählen"}
@@ -577,27 +632,18 @@ export default function NoShowCalculator() {
           ))}
         </select>
       ) : (
-        <input
-          name={field}
-          type={type}
-          value={formData[field]}
-          onChange={handleChange}
-          style={S.input(!!formErrors[field])}
-          {...extraProps}
-        />
+        <input name={field} type={type} value={formData[field]} onChange={handleChange} style={S.input(!!formErrors[field])} {...extraProps} />
       )}
       {formErrors[field] && <p style={S.error}>Bitte ausfüllen.</p>}
     </div>
   );
 
-  // Pink slider “failsafe” (falls Browser/CSS mal nicht greift)
   const pinkRangeStyle = { width: "100%", accentColor: "#ec4899" };
 
   return (
     <div id="no-show-calculator" ref={wrapperRef} style={S.wrapper}>
       <style>{S.grid2Media}</style>
 
-      {/* Progress */}
       <div ref={progressWrapRef} style={S.progressWrap}>
         <div style={S.progressTrack}>
           <div style={S.progressFill} />
@@ -607,7 +653,6 @@ export default function NoShowCalculator() {
         </div>
       </div>
 
-      {/* STEP 1 */}
       {!showResult && step === 1 && (
         <>
           <h2 style={S.h2}>Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
@@ -659,9 +704,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={pinkRangeStyle}
-                onMouseDown={stabilizeRangeStart}
-                onPointerDown={stabilizeRangeStart}
                 onTouchStart={stabilizeRangeStart}
+                onPointerDown={stabilizeRangeStart}
+                onMouseDown={stabilizeRangeStart}
               />
             </div>
 
@@ -690,7 +735,6 @@ export default function NoShowCalculator() {
         </>
       )}
 
-      {/* STEP 2 */}
       {!showResult && step === 2 && (
         <>
           <h2 style={S.h2Small}>Angaben zu deinem Restaurant</h2>
@@ -733,9 +777,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={pinkRangeStyle}
-                onMouseDown={stabilizeRangeStart}
-                onPointerDown={stabilizeRangeStart}
                 onTouchStart={stabilizeRangeStart}
+                onPointerDown={stabilizeRangeStart}
+                onMouseDown={stabilizeRangeStart}
               />
             </div>
 
@@ -763,7 +807,6 @@ export default function NoShowCalculator() {
         </>
       )}
 
-      {/* STEP 3 */}
       {!showResult && step === 3 && formData.hasOnlineReservation === "Ja" && (
         <>
           <h2 style={S.h2Small}>Details zum Reservierungssystem</h2>
@@ -792,7 +835,6 @@ export default function NoShowCalculator() {
         </>
       )}
 
-      {/* RESULT */}
       {showResult && (
         <>
           <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 28, marginTop: 8, fontWeight: 700 }}>Deine Auswertung</h2>
@@ -837,22 +879,8 @@ export default function NoShowCalculator() {
               style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18 }}
             >
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-                <input
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  placeholder="Vorname"
-                  style={S.input(false)}
-                  required
-                />
-                <input
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  placeholder="Nachname"
-                  style={S.input(false)}
-                  required
-                />
+                <input name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Vorname" style={S.input(false)} required />
+                <input name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Nachname" style={S.input(false)} required />
               </div>
 
               <div style={{ height: 12 }} />
@@ -921,16 +949,7 @@ export default function NoShowCalculator() {
           )}
 
           {submissionSuccess && (
-            <div
-              style={{
-                textAlign: "center",
-                background: "#dcfce7",
-                border: "1px solid #86efac",
-                padding: 18,
-                borderRadius: 16,
-                marginTop: 16,
-              }}
-            >
+            <div style={{ textAlign: "center", background: "#dcfce7", border: "1px solid #86efac", padding: 18, borderRadius: 16, marginTop: 16 }}>
               <h2 style={{ margin: "0 0 6px 0", fontSize: 18, fontWeight: 800, color: "#166534" }}>Vielen Dank!</h2>
               <p style={{ margin: 0, color: "#166534" }}>Dein No-Show-Report wurde erfolgreich per E-Mail versendet.</p>
             </div>
