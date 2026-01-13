@@ -155,66 +155,98 @@ export default function NoShowCalculator() {
   }, []);
 
   // ------------------------------------------------------------
-  // FIX #3 (HARDENED):
-  // Wenn Keyboard offen + User beginnt zu scrollen (touchmove/pointermove),
-  // blur sofort (vor iOS "focus restore" / auto-scroll).
-  // Zusätzlich: wenn User irgendwo tippt (touchstart) außerhalb eines Inputs -> blur.
-  // ------------------------------------------------------------
-  useEffect(() => {
-    const shouldBlurForEvent = (e) => {
-      if (!isKeyboardOpen()) return false;
+// FIX #3 (ANDROID/CHROME ROBUST):
+// - Blur, sobald irgendwo im Dokument gescrollt wird (Capture! auch für scroll-container)
+// - Blur bei pointerdown/touchstart, wenn Keyboard offen und ein Text-Input fokussiert ist
+//   (Slider/range ist explizit erlaubt als Target -> dann bluren wir den Text-Input)
+// ------------------------------------------------------------
+useEffect(() => {
+  const isKbOpen = () => {
+    try {
+      const vv = window.visualViewport;
+      if (!vv) return false;
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      return kb > 0;
+    } catch {
+      return false;
+    }
+  };
 
-      const el = document.activeElement;
-      if (!el) return false;
+  const isTextLikeInput = (el) => {
+    if (!el) return false;
+    const tag = el.tagName?.toLowerCase();
+    if (tag !== "input" && tag !== "textarea" && tag !== "select") return false;
+    const type = el.getAttribute?.("type")?.toLowerCase();
+    // range NIE als "Text input" behandeln
+    if (type === "range") return false;
+    return true;
+  };
 
-      const tag = el.tagName?.toLowerCase();
-      if (!["input", "textarea", "select"].includes(tag)) return false;
+  const shouldBlurNow = (eventTarget) => {
+    if (!isKbOpen()) return false;
 
-      const type = el.getAttribute?.("type")?.toLowerCase();
-      if (type === "range") return false;
+    const active = document.activeElement;
+    if (!isTextLikeInput(active)) return false;
 
-      // Wenn User direkt in ein anderes Input tippt, NICHT blur (sonst nervig)
-      const target = e?.target;
-      const tTag = target?.tagName?.toLowerCase?.();
-      if (tTag && ["input", "textarea", "select"].includes(tTag)) return false;
+    // Wenn der User in dasselbe aktive Feld tippt -> nicht blur
+    if (eventTarget === active) return false;
 
-      return true;
-    };
+    // Wenn der User auf ein anderes Textfeld tippt -> nicht blur (sonst nervig)
+    const tTag = eventTarget?.tagName?.toLowerCase?.();
+    const tType = eventTarget?.getAttribute?.("type")?.toLowerCase?.();
 
-    const onTouchMove = (e) => {
-      if (!shouldBlurForEvent(e)) return;
-      blurTextInputIfAny();
-    };
+    const targetIsTextLike =
+      (tTag === "input" && tType !== "range") || tTag === "textarea" || tTag === "select";
 
-    const onPointerMove = (e) => {
-      if (!shouldBlurForEvent(e)) return;
-      blurTextInputIfAny();
-    };
+    if (targetIsTextLike) return false;
 
-    const onWheel = (e) => {
-      if (!shouldBlurForEvent(e)) return;
-      blurTextInputIfAny();
-    };
+    // WICHTIG: Range/Slider ist erlaubt -> dann WOLLEN wir blur
+    return true;
+  };
 
-    const onTouchStart = (e) => {
-      // Beim ersten Tap irgendwo außerhalb Inputs -> blur (damit Slider-Touch nicht hochzieht)
-      if (!shouldBlurForEvent(e)) return;
-      blurTextInputIfAny();
-    };
+  const blurActive = () => {
+    try {
+      const a = document.activeElement;
+      if (isTextLikeInput(a)) a.blur?.();
+    } catch {}
+  };
 
-    // capture = früher dran als bubbling (wichtig für iOS)
-    window.addEventListener("touchmove", onTouchMove, { passive: true, capture: true });
-    window.addEventListener("pointermove", onPointerMove, { passive: true, capture: true });
-    window.addEventListener("wheel", onWheel, { passive: true, capture: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true, capture: true });
+  let raf = 0;
+  const scheduleBlur = (target) => {
+    if (!shouldBlurNow(target)) return;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => blurActive());
+  };
 
-    return () => {
-      window.removeEventListener("touchmove", onTouchMove, true);
-      window.removeEventListener("pointermove", onPointerMove, true);
-      window.removeEventListener("wheel", onWheel, true);
-      window.removeEventListener("touchstart", onTouchStart, true);
-    };
-  }, [blurTextInputIfAny]);
+  // 1) Scroll auf JEDEM Element im Dokument (capture=true) -> blur
+  const onAnyScrollCapture = (e) => {
+    scheduleBlur(e.target);
+  };
+
+  // 2) Früher als onClick: pointerdown/touchstart capture -> blur
+  const onPointerDownCapture = (e) => {
+    // closest() ist wichtig, weil oft span/div im Slider/Label getroffen wird
+    const t = e.target?.closest?.("*") || e.target;
+    scheduleBlur(t);
+  };
+
+  const onTouchStartCapture = (e) => {
+    const t = e.target?.closest?.("*") || e.target;
+    scheduleBlur(t);
+  };
+
+  document.addEventListener("scroll", onAnyScrollCapture, true);
+  document.addEventListener("pointerdown", onPointerDownCapture, true);
+  document.addEventListener("touchstart", onTouchStartCapture, true);
+
+  return () => {
+    cancelAnimationFrame(raf);
+    document.removeEventListener("scroll", onAnyScrollCapture, true);
+    document.removeEventListener("pointerdown", onPointerDownCapture, true);
+    document.removeEventListener("touchstart", onTouchStartCapture, true);
+  };
+}, []);
+
 
   // ------------------------------------------------------------
   // Range Interaction: zusätzlich stabilisieren (falls iOS trotzdem kurz springt)
@@ -704,9 +736,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={pinkRangeStyle}
-                onTouchStart={stabilizeRangeStart}
-                onPointerDown={stabilizeRangeStart}
-                onMouseDown={stabilizeRangeStart}
+                onTouchStartCapture={stabilizeRangeStart}
+                onPointerDownCapture={stabilizeRangeStart}
+                onMouseDownCapture={stabilizeRangeStart}
               />
             </div>
 
@@ -777,9 +809,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={pinkRangeStyle}
-                onTouchStart={stabilizeRangeStart}
-                onPointerDown={stabilizeRangeStart}
-                onMouseDown={stabilizeRangeStart}
+                onTouchStartCapture={stabilizeRangeStart}
+                onPointerDownCapture={stabilizeRangeStart}
+                onMouseDownCapture={stabilizeRangeStart}
               />
             </div>
 
