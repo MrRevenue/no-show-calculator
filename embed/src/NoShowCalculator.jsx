@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export default function NoShowCalculator() {
+export default function NoShowCalculator({ onRequestScrollTop }) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     restaurantType: "",
@@ -25,57 +25,27 @@ export default function NoShowCalculator() {
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [showPolicyError, setShowPolicyError] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState(null);
+  const [submissionStatus, setSubmissionStatus] = useState(null); // 'submitting' | 'success' | 'error' | null
   const [showForm, setShowForm] = useState(true);
   const [emailError, setEmailError] = useState("");
-
-  const topRef = useRef(null);
   const contactFormRef = useRef(null);
 
-  const isInIframe = useMemo(() => {
-    try {
-      return window.self !== window.top;
-    } catch {
-      return true;
-    }
-  }, []);
-
-  const prefersReducedMotion = useMemo(() => {
-    try {
-      return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const scrollToTop = (behavior = "auto") => {
-    const el = topRef.current;
-    if (!el) return;
-
-    // In Mobile + iFrame ist "smooth" oft der Auslöser fürs Festhängen/Beibehalten der Scrollposition.
-    const safeBehavior = prefersReducedMotion ? "auto" : behavior;
-
-    // zwei Frames sind stabiler, weil der neue Step erst gerendert werden muss
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        try {
-          el.scrollIntoView({ block: "start", behavior: safeBehavior });
-        } catch {}
-      });
-    });
-  };
-
   /**
-   * Keyboard/Viewport: nur CSS var setzen, kein Fokus-Scroll-Hack im iFrame.
+   * ✅ Embed/Mobile-Keyboard: möglichst stabil
+   * - Kein globales focusin-scrollIntoView im iFrame (macht Jumping)
+   * - VisualViewport nur für kb-padding (CSS var --kb)
    */
   useEffect(() => {
-    let onFocusIn;
+    const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
+    let onFocusIn;
     if (!isInIframe) {
       onFocusIn = (e) => {
         const el = e.target;
-        const tag = el?.tagName?.toLowerCase();
+        if (!el) return;
+        const tag = el.tagName?.toLowerCase();
         if (!["input", "textarea", "select"].includes(tag)) return;
+
         setTimeout(() => {
           try {
             el.scrollIntoView({ block: "nearest" });
@@ -87,7 +57,6 @@ export default function NoShowCalculator() {
 
     const vv = window.visualViewport;
     let cleanupVv = null;
-
     if (vv) {
       const updateKb = () => {
         const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
@@ -102,23 +71,21 @@ export default function NoShowCalculator() {
       if (onFocusIn) window.removeEventListener("focusin", onFocusIn);
       if (cleanupVv) cleanupVv();
     };
-  }, [isInIframe]);
+  }, []);
 
-  // ✅ Step-Wechsel immer nach oben – Shadow-safe via ref
+  // CTA: Kontaktformular öffnen -> bewusst scrollen (optional)
   useEffect(() => {
-    // Ergebnis + Step-Wechsel beides hochscrollen
-    scrollToTop(isInIframe ? "auto" : "smooth");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, showResult]);
-
-  useEffect(() => {
-    if (showContactForm && contactFormRef.current) {
-      // CTA darf smooth sein
-      try {
-        contactFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch {}
+    if (showContactForm) {
+      // Erst sauber nach oben (damit es nicht "irgendwo" startet)
+      onRequestScrollTop?.();
+      // Danach zur Form
+      setTimeout(() => {
+        try {
+          contactFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch {}
+      }, 250);
     }
-  }, [showContactForm]);
+  }, [showContactForm, onRequestScrollTop]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -145,7 +112,11 @@ export default function NoShowCalculator() {
       2: ["restaurantType", "openDays", "averageSpend", "hasOnlineReservation"],
       3:
         formData.hasOnlineReservation === "Ja"
-          ? ["reservationTool", "feeForNoShow", ...(formData.feeForNoShow === "Ja" ? ["noShowFee"] : [])]
+          ? [
+              "reservationTool",
+              "feeForNoShow",
+              ...(formData.feeForNoShow === "Ja" ? ["noShowFee"] : []),
+            ]
           : [],
     };
 
@@ -158,17 +129,26 @@ export default function NoShowCalculator() {
   };
 
   const goFromStep1 = () => {
-    if (validateStep(1)) setStep(2);
+    if (validateStep(1)) {
+      setStep(2);
+      onRequestScrollTop?.();
+    }
   };
 
   const goFromStep2 = () => {
-    if (!validateStep(2)) return;
-    if (formData.hasOnlineReservation === "Ja") setStep(3);
-    else setShowResult(true);
+    if (validateStep(2)) {
+      if (formData.hasOnlineReservation === "Ja") setStep(3);
+      else setShowResult(true);
+
+      onRequestScrollTop?.();
+    }
   };
 
   const goFromStep3 = () => {
-    if (validateStep(3)) setShowResult(true);
+    if (validateStep(3)) {
+      setShowResult(true);
+      onRequestScrollTop?.();
+    }
   };
 
   const reservationToolOptions = [
@@ -204,6 +184,7 @@ export default function NoShowCalculator() {
 
   const currency = "€";
 
+  // --- Rechenlogik (personenbasiert, 30 Tage) ---
   const reservationsPerDay = +formData.reservationsPerDay || 0;
   const avgGuestsPerReservation = +formData.avgGuestsPerReservation || 0;
   const openDaysPerWeek = +formData.openDays || 0;
@@ -213,8 +194,8 @@ export default function NoShowCalculator() {
   const avgGuestsSliderValue = avgGuestsPerReservation || 2;
   const avgSpendSliderValue = avgSpendPerGuest || 50;
 
-  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (8 - 1)) * 100;
-  const avgSpendPercent = ((avgSpendSliderValue - 10) / (500 - 10)) * 100;
+  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (8 - 1)) * 100; // 1..8
+  const avgSpendPercent = ((avgSpendSliderValue - 10) / (500 - 10)) * 100; // 10..500
 
   const noShowFeePerGuest = formData.feeForNoShow === "Ja" ? +formData.noShowFee || 0 : 0;
 
@@ -267,7 +248,9 @@ export default function NoShowCalculator() {
     }
 
     if (!isBusinessEmail(formData.email)) {
-      setEmailError("Bitte gib eine geschäftliche E-Mail-Adresse an (keine Freemailer wie gmail.com, gmx.de etc.).");
+      setEmailError(
+        "Bitte gib eine geschäftliche E-Mail-Adresse an (keine Freemailer wie gmail.com, gmx.de etc.)."
+      );
       return;
     }
 
@@ -276,7 +259,16 @@ export default function NoShowCalculator() {
 
     const fullFormData = {
       ...formData,
-      calculated: { noShowRate, loss30, totalRevenue30, upsell, roi, totalReservations30, totalGuests30, noShowGuests30 },
+      calculated: {
+        noShowRate,
+        loss30,
+        totalRevenue30,
+        upsell,
+        roi,
+        totalReservations30,
+        totalGuests30,
+        noShowGuests30,
+      },
     };
 
     try {
@@ -302,10 +294,12 @@ export default function NoShowCalculator() {
     }
   };
 
+  // Fortschrittsbalken (4 Schritte)
   const totalSteps = 4;
   const currentStepForProgress = showResult ? 4 : step;
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
 
+  // --- Styles (Embed-robust, nicht Tailwind-abhängig) ---
   const S = {
     wrapper: {
       maxWidth: 650,
@@ -315,14 +309,28 @@ export default function NoShowCalculator() {
       color: "#111827",
     },
 
-    // ✅ H2 wie gewünscht: font-weight 300
-    h2: { fontSize: 36, lineHeight: 1.12, margin: "8px 0 10px 0", fontWeight: 300 },
-    h2Small: { fontSize: 22, lineHeight: 1.2, margin: "0 0 14px 0", fontWeight: 300 },
+    // H2 wie LP: leichter (300)
+    h2: {
+      fontSize: 40,
+      lineHeight: 1.05,
+      margin: "8px 0 12px 0",
+      fontWeight: 300,
+      letterSpacing: "-0.01em",
+    },
 
-    p: { fontSize: 15, lineHeight: 1.45, color: "#4b5563", margin: "0 0 16px 0" },
+    h2Small: { fontSize: 22, lineHeight: 1.2, margin: "0 0 14px 0", fontWeight: 600 },
 
-    label: { display: "block", fontSize: 14, fontWeight: 600, color: "#374151", margin: "0 0 6px 0" },
-    helper: { fontSize: 12, color: "#6b7280", marginTop: 6 },
+    p: { fontSize: 16, lineHeight: 1.55, color: "#4b5563", margin: "0 0 18px 0" },
+
+    label: {
+      display: "block",
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#111827",
+      margin: "0 0 6px 0",
+    },
+
+    helper: { fontSize: 13, color: "#6b7280", marginTop: 8, lineHeight: 1.4 },
     error: { fontSize: 12, color: "#ec4899", marginTop: 6 },
 
     field: { marginBottom: 28 },
@@ -331,8 +339,8 @@ export default function NoShowCalculator() {
       width: "100%",
       fontSize: 16,
       lineHeight: 1.25,
-      padding: "10px 12px",
-      borderRadius: 10,
+      padding: "12px 14px",
+      borderRadius: 12,
       border: `1px solid ${isError ? "#ec4899" : "#d1d5db"}`,
       outline: "none",
       background: "#fff",
@@ -343,21 +351,101 @@ export default function NoShowCalculator() {
       width: "100%",
       fontSize: 16,
       lineHeight: 1.25,
-      padding: "10px 12px",
-      borderRadius: 10,
+      padding: "12px 14px",
+      borderRadius: 12,
       border: `1px solid ${isError ? "#ec4899" : "#d1d5db"}`,
       background: "#fff",
       color: "inherit",
     }),
 
+    btnPrimary: {
+      backgroundColor: "#fe4497",
+      border: "2px solid transparent",
+      borderRadius: 999,
+      color: "#fff",
+      fontFamily: "Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+      fontSize: 14,
+      fontWeight: 600,
+      padding: "16px 44px",
+      textTransform: "uppercase",
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      letterSpacing: "0.02em",
+    },
+
+    btnSecondary: {
+      backgroundColor: "#e5e7eb",
+      border: "2px solid transparent",
+      borderRadius: 999,
+      color: "#111827",
+      fontFamily: "Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+      fontSize: 14,
+      fontWeight: 600,
+      padding: "12px 20px",
+      cursor: "pointer",
+    },
+
+    btnGreen: {
+      backgroundColor: "#16a34a",
+      border: "2px solid transparent",
+      borderRadius: 999,
+      color: "#fff",
+      fontFamily: "Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+      fontSize: 14,
+      fontWeight: 700,
+      padding: "12px 20px",
+      cursor: "pointer",
+    },
+
+    progressWrap: { marginBottom: 18 },
+    progressTrack: { width: "100%", height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden" },
+    progressFill: { height: "100%", background: "#ec4899", width: `${progressPercent}%`, transition: "width 250ms ease" },
     progressText: { marginTop: 6, fontSize: 12, color: "#6b7280", textAlign: "right" },
+
+    grid2: {
+      display: "grid",
+      gridTemplateColumns: "1fr",
+      gap: 14,
+    },
+
+    card: {
+      background: "#111",
+      color: "#fff",
+      padding: 22,
+      borderRadius: 18,
+      textAlign: "center",
+    },
+
+    cardTitle: { fontSize: 13, opacity: 0.9, margin: "0 0 10px 0" },
+
+    // KPI: explizit weiß, nicht grau
+    cardValue: { fontSize: 44, fontWeight: 800, margin: 0, color: "#ffffff" },
+
+    // responsive-ish: wenn Platz -> 2 Spalten
+    grid2Media: `
+      @media (min-width: 640px) {
+        .ns-grid-2 { grid-template-columns: 1fr 1fr; }
+      }
+      @media (max-width: 420px) {
+        .ns-h2 { font-size: 32px !important; }
+        .ns-btn-wide { width: 100% !important; }
+      }
+    `,
   };
 
   const renderField = (field, label, type = "text", options = null) => (
     <div key={field} style={S.field}>
       <label style={S.label}>{label}</label>
       {options ? (
-        <select name={field} value={formData[field]} onChange={handleChange} style={S.select(!!formErrors[field])}>
+        <select
+          name={field}
+          value={formData[field]}
+          onChange={handleChange}
+          style={S.select(!!formErrors[field])}
+        >
           {options.map((opt, i) => (
             <option key={i} value={opt}>
               {opt || "Bitte wählen"}
@@ -365,7 +453,13 @@ export default function NoShowCalculator() {
           ))}
         </select>
       ) : (
-        <input name={field} type={type} value={formData[field]} onChange={handleChange} style={S.input(!!formErrors[field])} />
+        <input
+          name={field}
+          type={type}
+          value={formData[field]}
+          onChange={handleChange}
+          style={S.input(!!formErrors[field])}
+        />
       )}
       {formErrors[field] && <p style={S.error}>Bitte ausfüllen.</p>}
     </div>
@@ -373,13 +467,12 @@ export default function NoShowCalculator() {
 
   return (
     <div style={S.wrapper}>
-      {/* Top anchor (Shadow-safe scroll target) */}
-      <div ref={topRef} />
+      <style>{S.grid2Media}</style>
 
       {/* Progress */}
-      <div style={{ marginBottom: 18 }}>
-        <div className="ns-progress-track">
-          <div className="ns-progress-fill" style={{ width: `${progressPercent}%` }} />
+      <div style={S.progressWrap}>
+        <div style={S.progressTrack}>
+          <div style={S.progressFill} />
         </div>
         <div style={S.progressText}>
           Schritt {currentStepForProgress} von {totalSteps}
@@ -389,9 +482,14 @@ export default function NoShowCalculator() {
       {/* STEP 1 */}
       {!showResult && step === 1 && (
         <>
-          <h2 style={S.h2}>Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
-          <p style={S.p}>Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.</p>
+          <h2 className="ns-h2" style={S.h2}>
+            Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust
+          </h2>
+          <p style={S.p}>
+            Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.
+          </p>
 
+          {/* 1 */}
           <div style={S.field}>
             <label style={S.label}>Ø Reservierungen pro Öffnungstag (alle Kanäle, z. B. 40)</label>
             <input
@@ -408,6 +506,7 @@ export default function NoShowCalculator() {
             </p>
           </div>
 
+          {/* 2 Slider Gäste */}
           <div style={{ marginBottom: 32 }}>
             <label style={{ ...S.label, marginBottom: 14 }}>Ø Gäste pro Reservierung (z. B. 2,0 Personen)</label>
 
@@ -416,7 +515,7 @@ export default function NoShowCalculator() {
               <div
                 style={{
                   position: "absolute",
-                  top: -18,
+                  top: -20,
                   left: `${avgGuestsPercent}%`,
                   transform: "translateX(-50%)",
                   fontSize: 12,
@@ -437,7 +536,8 @@ export default function NoShowCalculator() {
                 step="0.5"
                 value={avgGuestsSliderValue}
                 onChange={handleChange}
-                className="pink-slider"
+                className="pink-slider ns-slider"
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -445,6 +545,7 @@ export default function NoShowCalculator() {
             {formErrors.avgGuestsPerReservation && <p style={S.error}>Bitte ausfüllen.</p>}
           </div>
 
+          {/* 3 */}
           <div style={S.field}>
             <label style={S.label}>
               Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung ohne rechtzeitige Absage nicht erschienen? (Schätzung)
@@ -460,7 +561,7 @@ export default function NoShowCalculator() {
             <p style={S.helper}>Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen.</p>
           </div>
 
-          <button type="button" onClick={goFromStep1} className="ns-btn-primary">
+          <button type="button" onClick={goFromStep1} style={S.btnPrimary} className="ns-btn-wide">
             Weiter
           </button>
         </>
@@ -474,6 +575,7 @@ export default function NoShowCalculator() {
           {renderField("restaurantType", "Um welche Art von Restaurant handelt es sich?", "text", restaurantTypeOptions)}
           {renderField("openDays", "Anzahl Tage pro Woche geöffnet (z. B. 5)", "number")}
 
+          {/* Slider Umsatz */}
           <div style={{ marginBottom: 32 }}>
             <label style={{ ...S.label, marginBottom: 14 }}>Ø Umsatz pro Gast ({currency})</label>
 
@@ -481,7 +583,7 @@ export default function NoShowCalculator() {
               <div
                 style={{
                   position: "absolute",
-                  top: -18,
+                  top: -20,
                   left: `${avgSpendPercent}%`,
                   transform: "translateX(-50%)",
                   fontSize: 12,
@@ -502,7 +604,8 @@ export default function NoShowCalculator() {
                 step="5"
                 value={avgSpendSliderValue}
                 onChange={handleChange}
-                className="pink-slider"
+                className="pink-slider ns-slider"
+                style={{ width: "100%" }}
               />
             </div>
 
@@ -510,13 +613,18 @@ export default function NoShowCalculator() {
             {formErrors.averageSpend && <p style={S.error}>Bitte ausfüllen.</p>}
           </div>
 
-          {renderField("hasOnlineReservation", "Ist für das Restaurant ein Online-Reservierungssystem im Einsatz?", "text", ["", "Ja", "Nein"])}
+          {renderField(
+            "hasOnlineReservation",
+            "Ist für das Restaurant ein Online-Reservierungssystem im Einsatz?",
+            "text",
+            ["", "Ja", "Nein"]
+          )}
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button type="button" onClick={() => setStep(1)} className="ns-btn-secondary">
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, gap: 12 }}>
+            <button type="button" onClick={() => { setStep(1); onRequestScrollTop?.(); }} style={S.btnSecondary}>
               Zurück
             </button>
-            <button type="button" onClick={goFromStep2} className="ns-btn-primary">
+            <button type="button" onClick={goFromStep2} style={S.btnPrimary}>
               Weiter
             </button>
           </div>
@@ -534,11 +642,11 @@ export default function NoShowCalculator() {
           {formData.feeForNoShow === "Ja" &&
             renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number")}
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button type="button" onClick={() => setStep(2)} className="ns-btn-secondary">
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, gap: 12 }}>
+            <button type="button" onClick={() => { setStep(2); onRequestScrollTop?.(); }} style={S.btnSecondary}>
               Zurück
             </button>
-            <button type="button" onClick={goFromStep3} className="ns-btn-green">
+            <button type="button" onClick={goFromStep3} style={S.btnGreen}>
               Auswertung anzeigen
             </button>
           </div>
@@ -548,17 +656,19 @@ export default function NoShowCalculator() {
       {/* RESULT */}
       {showResult && (
         <>
-          <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 28, marginTop: 8 }}>Deine Auswertung</h2>
+          <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 28, marginTop: 8, fontWeight: 600 }}>
+            Deine Auswertung
+          </h2>
 
-          <div className="ns-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginBottom: 24 }}>
-            <div className="ns-card">
-              <div className="ns-card-title">No-Show-Rate (30 Tage)</div>
-              <p className="ns-card-value">{noShowRate.toFixed(1)}%</p>
+          <div className="ns-grid-2" style={{ ...S.grid2, marginBottom: 24 }}>
+            <div style={S.card}>
+              <div style={S.cardTitle}>No-Show-Rate (30 Tage)</div>
+              <p style={S.cardValue}>{noShowRate.toFixed(1)}%</p>
             </div>
 
-            <div className="ns-card">
-              <div className="ns-card-title">Umsatzverlust durch No-Shows (30 Tage)</div>
-              <p className="ns-card-value">
+            <div style={S.card}>
+              <div style={S.cardTitle}>Umsatzverlust durch No-Shows (30 Tage)</div>
+              <p style={S.cardValue}>
                 {format(loss30)} {currency}
               </p>
             </div>
@@ -566,31 +676,69 @@ export default function NoShowCalculator() {
 
           {showForm && (
             <div style={{ textAlign: "center", marginTop: 10 }}>
-              <p style={{ margin: "0 0 14px 0", fontWeight: 600, color: "#111827" }}>
+              <p style={{ margin: "0 0 14px 0", fontWeight: 600, color: "#111827", fontSize: 18, lineHeight: 1.35 }}>
                 Möchtest du eine detaillierte Auswertung als PDF inkl. konkreter Handlungsempfehlungen für dein Restaurant erhalten?
               </p>
 
-              <button type="button" onClick={() => setShowContactForm(true)} className="ns-btn-primary">
+              <button
+                type="button"
+                onClick={() => setShowContactForm(true)}
+                style={S.btnPrimary}
+                className="ns-btn-wide"
+              >
                 Ja, PDF-Report erhalten
               </button>
             </div>
           )}
 
           {showContactForm && !submissionSuccess && (
-            <form ref={contactFormRef} onSubmit={handleSubmit} style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18 }}>
+            <form
+              ref={contactFormRef}
+              onSubmit={handleSubmit}
+              style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18 }}
+            >
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-                <input name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Vorname" style={S.input(false)} required />
-                <input name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Nachname" style={S.input(false)} required />
+                <input
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  placeholder="Vorname"
+                  style={S.input(false)}
+                  required
+                />
+                <input
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Nachname"
+                  style={S.input(false)}
+                  required
+                />
               </div>
 
               <div style={{ height: 12 }} />
 
-              <input name="restaurantName" value={formData.restaurantName} onChange={handleChange} placeholder="Name des Restaurants" style={S.input(false)} required />
+              <input
+                name="restaurantName"
+                value={formData.restaurantName}
+                onChange={handleChange}
+                placeholder="Name des Restaurants"
+                style={S.input(false)}
+                required
+              />
 
               <div style={{ height: 12 }} />
 
               <div>
-                <input name="email" value={formData.email} onChange={handleChange} type="email" placeholder="Business-E-Mail-Adresse" style={S.input(false)} required />
+                <input
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  type="email"
+                  placeholder="Business-E-Mail-Adresse"
+                  style={S.input(false)}
+                  required
+                />
                 {emailError && <p style={{ marginTop: 8, color: "#dc2626", fontSize: 13 }}>{emailError}</p>}
               </div>
 
@@ -608,36 +756,59 @@ export default function NoShowCalculator() {
                 />
                 <label htmlFor="policy" style={{ fontSize: 13, color: "#374151", lineHeight: 1.4 }}>
                   Ich bin mit der Verarbeitung meiner Daten und der Zusendung des Reports per E-Mail einverstanden und habe die{" "}
-                  <a href="https://www.aleno.me/de/datenschutz" target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
+                  <a
+                    href="https://www.aleno.me/de/datenschutz"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ textDecoration: "underline" }}
+                  >
                     Datenschutzerklärung
                   </a>{" "}
                   gelesen.
                 </label>
               </div>
 
-              {showPolicyError && <p style={{ marginTop: 8, color: "#dc2626", fontSize: 13 }}>Bitte bestätige die Datenschutzerklärung.</p>}
+              {showPolicyError && (
+                <p style={{ marginTop: 8, color: "#dc2626", fontSize: 13 }}>
+                  Bitte bestätige die Datenschutzerklärung.
+                </p>
+              )}
 
               <div style={{ marginTop: 14 }}>
                 <button
                   type="submit"
-                  className="ns-btn-primary"
-                  style={{ width: "100%", opacity: submissionStatus === "submitting" ? 0.7 : 1 }}
+                  style={{ ...S.btnPrimary, width: "100%", opacity: submissionStatus === "submitting" ? 0.7 : 1 }}
                   disabled={submissionStatus === "submitting"}
                 >
                   {submissionStatus === "submitting" ? "Wird gesendet…" : "PDF-Report anfordern"}
                 </button>
 
                 {submissionStatus === "error" && (
-                  <p style={{ marginTop: 10, color: "#dc2626", fontSize: 13 }}>Fehler beim Senden. Bitte versuche es später erneut.</p>
+                  <p style={{ marginTop: 10, color: "#dc2626", fontSize: 13 }}>
+                    Fehler beim Senden. Bitte versuche es später erneut.
+                  </p>
                 )}
               </div>
             </form>
           )}
 
           {submissionSuccess && (
-            <div style={{ textAlign: "center", background: "#dcfce7", border: "1px solid #86efac", padding: 18, borderRadius: 16, marginTop: 16 }}>
-              <h2 style={{ margin: "0 0 6px 0", fontSize: 18, fontWeight: 800, color: "#166534" }}>Vielen Dank!</h2>
-              <p style={{ margin: 0, color: "#166534" }}>Dein No-Show-Report wurde erfolgreich per E-Mail versendet.</p>
+            <div
+              style={{
+                textAlign: "center",
+                background: "#dcfce7",
+                border: "1px solid #86efac",
+                padding: 18,
+                borderRadius: 16,
+                marginTop: 16,
+              }}
+            >
+              <h2 style={{ margin: "0 0 6px 0", fontSize: 18, fontWeight: 800, color: "#166534" }}>
+                Vielen Dank!
+              </h2>
+              <p style={{ margin: 0, color: "#166534" }}>
+                Dein No-Show-Report wurde erfolgreich per E-Mail versendet.
+              </p>
             </div>
           )}
         </>
