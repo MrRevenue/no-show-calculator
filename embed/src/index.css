@@ -1,157 +1,255 @@
 /* embed/src/index.css */
-
-/* Tailwind v4 */
 @import "tailwindcss";
 
-/* Poppins */
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
-
-/* Optional: Theme-Variablen wie in global.css (schadet nicht) */
-:host {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :host {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-/* Baseline im Shadow */
+/* -----------------------------
+   Base / Reset (Shadow scoped)
+------------------------------ */
 :host,
 #ns-mount {
-  background: var(--background);
-  color: var(--foreground);
   font-family: Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
     "Apple Color Emoji", "Segoe UI Emoji";
-  font-size: 16px; /* wichtig gegen Mobile-Zoom */
+  font-size: 16px; /* verhindert Mobile-Input-Zoom */
   line-height: 1.4;
+  color: #111827;
 }
 
+/* ein bisschen “Layout-Sicherheit” im Shadow */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-/* Inputs baseline */
-#ns-mount input,
-#ns-mount select,
-#ns-mount textarea {
-  font: inherit;
-  font-size: 16px;
-  line-height: 1.25;
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #d1d5db;
-  background: #fff;
+a {
   color: inherit;
 }
 
-#ns-mount input:focus,
-#ns-mount select:focus,
-#ns-mount textarea:focus {
+/* -----------------------------
+   Typo (Headline wie auf LP)
+------------------------------ */
+h2 {
+  /* “Hero-ish” – responsiv, ähnlich euren Landing Headings */
+  font-size: clamp(32px, 3.2vw, 52px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  margin: 0 0 0.5rem 0;
+}
+
+h3 {
+  font-weight: 700;
+}
+
+p {
+  margin: 0.25rem 0;
+  color: #374151;
+}
+
+/* Step-Label “Schritt X von Y” */
+.ns-stepmeta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* -----------------------------
+   Form Controls (HubSpot-safe)
+------------------------------ */
+label {
+  display: block;
+  margin: 0 0 6px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.25;
+  padding: 10px 12px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
   outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
   border-color: #ec4899;
-  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.18);
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
 }
 
-/* Buttons: 1:1 aus global.css – aber scoped */
-#ns-mount button {
-  background-color: #fe4497;
-  border: 2px solid hsla(0, 0%, 100%, 0);
-  border-radius: 36px;
-  color: #fff;
+/* Fehlerzustand */
+.ns-error {
+  border-color: #ec4899 !important;
+}
+
+.ns-error-text {
+  color: #ec4899;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* -----------------------------
+   Buttons (aleno pink)
+------------------------------ */
+button {
   font-family: Poppins, sans-serif;
-  font-size: 0.875rem;
-  font-style: normal;
-  font-weight: 400;
-  padding: 1rem 3.125rem;
-  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
   text-transform: uppercase;
+
+  background-color: #fe4497;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0);
+  border-radius: 36px;
+  padding: 1rem 3.125rem;
+
   cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease,
+    transform 150ms ease;
 }
 
-#ns-mount button:hover {
+button:hover {
   background-color: #fff;
-  border: 2px solid #fe4497;
-  border-radius: 36px;
+  border-color: #fe4497;
   color: #fe4497;
 }
 
-/* kb-safe (wie bei dir) */
-#ns-mount .kb-safe {
+button:active {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* kleinere Secondary Buttons */
+.ns-btn-secondary {
+  background: #e5e7eb;
+  color: #111827;
+  border-color: transparent;
+  text-transform: none;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+}
+.ns-btn-secondary:hover {
+  background: #d1d5db;
+  color: #111827;
+  border-color: transparent;
+}
+
+/* -----------------------------
+   Progress Bar (falls Tailwind mal zickt)
+------------------------------ */
+.ns-progress-wrap {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.ns-progress-bar {
+  height: 100%;
+  background: #ec4899;
+  width: 0%;
+}
+
+/* -----------------------------
+   Keyboard safe padding helper
+------------------------------ */
+.kb-safe {
   padding-bottom: calc(var(--kb, 0px) + 24px);
 }
 
-/* --- Pink Slider Style (aus global.css) --- */
-#ns-mount input[type="range"].pink-slider {
+/* -----------------------------
+   Slider (dünner wie Vercel)
+------------------------------ */
+input[type="range"].pink-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 6px;
-  border-radius: 6px;
-  background: #f9a8d4;
+  height: 6px;                 /* <-- dünner */
+  border-radius: 999px;
+  background: #f9a8d4;         /* light pink track */
   outline: none;
   cursor: pointer;
-  position: relative;
-}
-
-#ns-mount .progress-bar {
-  height: 6px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  overflow: hidden;
-}
-
-#ns-mount .progress-bar__fill {
-  height: 100%;
-  background: #ec4899;
-  border-radius: inherit;
-  transition: width 0.3s ease;
-}
-
-#ns-mount .relative {
   position: relative;
 }
 
 /* Track */
-#ns-mount input[type="range"].pink-slider::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 6px;
+input[type="range"].pink-slider::-webkit-slider-runnable-track {
+  height: 6px;                 /* <-- dünner */
+  border-radius: 999px;
   background: #f9a8d4;
 }
 
 /* Thumb */
-#ns-mount input[type="range"].pink-slider::-webkit-slider-thumb {
+input[type="range"].pink-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 22px;
-  height: 22px;
+  width: 20px;                 /* minimal kleiner */
+  height: 20px;
+  border-radius: 999px;
   background: #ec4899;
-  border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-  margin-top: -8px; /* wichtig für vertikale Zentrierung */
+  border: 3px solid #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  margin-top: -7px;            /* zentriert auf 6px Track */
   position: relative;
-  z-index: 10;
+  z-index: 2;
 }
 
-/* Firefox */
-#ns-mount input[type="range"].pink-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  background: #ec4899;
-  border-radius: 50%;
-  border: 3px solid white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-
-#ns-mount input[type="range"].pink-slider::-moz-range-track {
+input[type="range"].pink-slider::-moz-range-track {
   height: 6px;
-  border-radius: 6px;
+  border-radius: 999px;
   background: #f9a8d4;
+}
+
+input[type="range"].pink-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ec4899;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Value-Bubble über Slider */
+.ns-slider-bubble {
+  position: absolute;
+  top: -18px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 700;
+  color: #ec4899;
+  white-space: nowrap;
+}
+
+/* -----------------------------
+   Kleine Layout-Helpers
+------------------------------ */
+.ns-field {
+  margin-bottom: 28px;
+}
+
+.ns-help {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 6px;
+}
+
+.ns-grid-2 {
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 640px) {
+  .ns-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
 }
