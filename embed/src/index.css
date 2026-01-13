@@ -127,6 +127,7 @@ button.ns-btn-green {
   height: 4px;              /* ✅ dünner */
   border-radius: 999px;
   background: rgba(254, 68, 151, 0.35);
+  accent-color: var(--ns-pink-2);
   outline: none;
 }
 

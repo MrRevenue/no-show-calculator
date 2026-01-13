@@ -597,7 +597,7 @@ export default function NoShowCalculator() {
                 value={avgGuestsSliderValue}
                 onChange={handleChange}
                 className="pink-slider"
-                style={{ width: "100%" }}
+                style={{ width: "100%", accentColor: "#ec4899" }}
                 onPointerDown={blurActiveTextInput}
                 onTouchStart={blurActiveTextInput}
                 onMouseDown={blurActiveTextInput}
@@ -676,7 +676,7 @@ export default function NoShowCalculator() {
                 value={avgSpendSliderValue}
                 onChange={handleChange}
                 className="pink-slider"
-                style={{ width: "100%" }}
+                style={{ width: "100%", accentColor: "#ec4899" }}
                 onPointerDown={blurActiveTextInput}
                 onTouchStart={blurActiveTextInput}
                 onMouseDown={blurActiveTextInput}
