@@ -28,27 +28,72 @@ export default function NoShowCalculator() {
   const [submissionStatus, setSubmissionStatus] = useState(null); // 'submitting' | 'success' | 'error' | null
   const [showForm, setShowForm] = useState(true);
   const [emailError, setEmailError] = useState("");
+
   const contactFormRef = useRef(null);
 
-  // ------------------------------------------------------------
-  // Scroll helper: zuverlässig im HubSpot-Kontext (Sticky Header)
-  // ------------------------------------------------------------
-  const scrollToEmbedTop = (behavior = "smooth") => {
-    try {
-      const container = document.getElementById("no-show-calculator");
-      if (!container) return;
+  /**
+   * -------------------------
+   * Scroll / Header Offset Helpers
+   * -------------------------
+   */
+  const getHeaderOffset = () => {
+    // HubSpot Themes sind unterschiedlich – versuchen, etwas “Headerartiges” zu finden
+    const header =
+      document.querySelector("header") ||
+      document.querySelector(".header") ||
+      document.querySelector(".navbar") ||
+      document.querySelector("[data-header]") ||
+      document.querySelector(".hs-menu-wrapper") ||
+      null;
 
-      // HubSpot hat oft einen sticky header -> Offset
-      const HEADER_OFFSET = 110;
-
-      const rect = container.getBoundingClientRect();
-      const targetY = Math.max(0, window.scrollY + rect.top - HEADER_OFFSET);
-
-      window.scrollTo({ top: targetY, behavior });
-    } catch {}
+    const h = header?.getBoundingClientRect?.().height || 0;
+    const extra = window.innerWidth < 768 ? 28 : 18; // mobile etwas mehr Luft
+    return Math.min(220, Math.max(0, h + extra));
   };
 
-  // Keyboard / VisualViewport (kb-padding via --kb)
+  const scrollToY = (y, behavior = "smooth") => {
+    window.scrollTo({ top: Math.max(0, y), behavior });
+  };
+
+  const scrollToElWithOffset = (el, behavior = "smooth") => {
+    if (!el) return;
+    const offset = getHeaderOffset();
+    const rect = el.getBoundingClientRect();
+    const y = window.scrollY + rect.top - offset;
+    scrollToY(y, behavior);
+  };
+
+  const scrollToEmbedTop = (behavior = "smooth") => {
+    const container = document.getElementById("no-show-calculator");
+    if (!container) return;
+    scrollToElWithOffset(container, behavior);
+  };
+
+  const blurActiveTextInput = () => {
+    const a = document.activeElement;
+    if (!a) return;
+    const tag = a.tagName?.toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") {
+      try {
+        a.blur();
+      } catch {}
+    }
+  };
+
+  const afterStepChangeScroll = () => {
+    // 2x rAF: wartet DOM/Layout ab, damit wir korrekt messen/scrollen
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToEmbedTop("smooth");
+      });
+    });
+  };
+
+  /**
+   * ✅ Embed/Mobile-Keyboard: stabilisieren
+   * - Kein globales focusin-scrollIntoView im iFrame (macht “Jumping”)
+   * - VisualViewport nur für kb-padding (CSS var --kb)
+   */
   useEffect(() => {
     const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
@@ -59,6 +104,8 @@ export default function NoShowCalculator() {
         if (!el) return;
         const tag = el.tagName?.toLowerCase();
         if (!["input", "textarea", "select"].includes(tag)) return;
+
+        // außerhalb iframe ist "nearest" ok
         setTimeout(() => {
           try {
             el.scrollIntoView({ block: "nearest" });
@@ -70,6 +117,7 @@ export default function NoShowCalculator() {
 
     const vv = window.visualViewport;
     let cleanupVv = null;
+
     if (vv) {
       const updateKb = () => {
         const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
@@ -86,28 +134,35 @@ export default function NoShowCalculator() {
     };
   }, []);
 
-  // Wenn Contact-Form aufgeht: bewusst scrollen (CTA)
+  /**
+   * PDF Formular einblenden → sauber hin scrollen (mit Header Offset)
+   */
   useEffect(() => {
     if (showContactForm && contactFormRef.current) {
-      // erst zum Embed-Top (damit Progress sichtbar bleibt), dann zum Formular
-      scrollToEmbedTop("smooth");
+      blurActiveTextInput();
       setTimeout(() => {
-        try {
-          contactFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        } catch {}
-      }, 150);
+        scrollToElWithOffset(contactFormRef.current, "smooth");
+      }, 50);
     }
   }, [showContactForm]);
+
+  /**
+   * -------------------------
+   * Form Handling
+   * -------------------------
+   */
+  const clampOpenDays = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return v;
+    return String(Math.min(7, Math.max(0, n)));
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     let newValue = type === "checkbox" ? checked : value;
 
-    // ✅ openDays clamp auf 1..7
-    if (name === "openDays") {
-      const n = Number(newValue);
-      if (Number.isFinite(n)) newValue = String(Math.min(7, Math.max(1, n)));
-    }
+    // max 7 Tage
+    if (name === "openDays") newValue = clampOpenDays(newValue);
 
     setFormData((prev) => ({ ...prev, [name]: newValue }));
     setFormErrors((prev) => ({ ...prev, [name]: false }));
@@ -142,39 +197,33 @@ export default function NoShowCalculator() {
     return Object.keys(errors).length === 0;
   };
 
-  // ✅ Nach Step-Wechsel: nach oben (inkl. Progressbar)
-  const afterStepChangeScroll = () => {
-    // 2 RAFs = deutlich stabiler bei HubSpot Layout/Fonts
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scrollToEmbedTop("smooth");
-      });
-    });
-  };
-
   const goFromStep1 = () => {
     if (!validateStep(1)) return;
+    blurActiveTextInput();
     setStep(2);
     afterStepChangeScroll();
   };
 
   const goFromStep2 = () => {
     if (!validateStep(2)) return;
-
-    if (formData.hasOnlineReservation === "Ja") {
-      setStep(3);
-    } else {
-      setShowResult(true);
-    }
+    blurActiveTextInput();
+    if (formData.hasOnlineReservation === "Ja") setStep(3);
+    else setShowResult(true);
     afterStepChangeScroll();
   };
 
   const goFromStep3 = () => {
     if (!validateStep(3)) return;
+    blurActiveTextInput();
     setShowResult(true);
     afterStepChangeScroll();
   };
 
+  /**
+   * -------------------------
+   * Options
+   * -------------------------
+   */
   const reservationToolOptions = [
     "",
     "aleno",
@@ -208,7 +257,11 @@ export default function NoShowCalculator() {
 
   const currency = "€";
 
-  // --- Rechenlogik (personenbasiert, 30 Tage) ---
+  /**
+   * -------------------------
+   * Calc
+   * -------------------------
+   */
   const reservationsPerDay = +formData.reservationsPerDay || 0;
   const avgGuestsPerReservation = +formData.avgGuestsPerReservation || 0;
   const openDaysPerWeek = +formData.openDays || 0;
@@ -316,12 +369,20 @@ export default function NoShowCalculator() {
     }
   };
 
-  // Fortschrittsbalken
+  /**
+   * -------------------------
+   * Progress
+   * -------------------------
+   */
   const totalSteps = 4;
   const currentStepForProgress = showResult ? 4 : step;
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
 
-  // --- Styles ---
+  /**
+   * -------------------------
+   * Styles (Embed-robust)
+   * -------------------------
+   */
   const S = {
     wrapper: {
       maxWidth: 650,
@@ -331,11 +392,12 @@ export default function NoShowCalculator() {
       color: "#111827",
     },
 
-    h2: { fontSize: 32, lineHeight: 1.15, margin: "8px 0 10px 0", fontWeight: 300 },
-    h2Small: { fontSize: 22, lineHeight: 1.2, margin: "0 0 14px 0", fontWeight: 600 },
+    // H2: eher wie Landingpages, leichter (300)
+    h2: { fontSize: 34, lineHeight: 1.15, margin: "8px 0 10px 0", fontWeight: 300 },
+    h2Small: { fontSize: 22, lineHeight: 1.2, margin: "0 0 14px 0", fontWeight: 300 },
     p: { fontSize: 15, lineHeight: 1.45, color: "#4b5563", margin: "0 0 16px 0" },
 
-    label: { display: "block", fontSize: 14, fontWeight: 600, color: "#374151", margin: "0 0 6px 0" },
+    label: { display: "block", fontSize: 14, fontWeight: 600, color: "#111827", margin: "0 0 6px 0" },
     helper: { fontSize: 12, color: "#6b7280", marginTop: 6 },
     error: { fontSize: 12, color: "#ec4899", marginTop: 6 },
 
@@ -351,6 +413,7 @@ export default function NoShowCalculator() {
       outline: "none",
       background: "#fff",
       color: "inherit",
+      boxSizing: "border-box",
     }),
 
     select: (isError) => ({
@@ -362,6 +425,7 @@ export default function NoShowCalculator() {
       border: `1px solid ${isError ? "#ec4899" : "#d1d5db"}`,
       background: "#fff",
       color: "inherit",
+      boxSizing: "border-box",
     }),
 
     btnPrimary: {
@@ -393,6 +457,20 @@ export default function NoShowCalculator() {
       cursor: "pointer",
     },
 
+    // Seite 3 Button soll pink (nicht grün)
+    btnPinkAlt: {
+      backgroundColor: "#fe4497",
+      border: "2px solid transparent",
+      borderRadius: 999,
+      color: "#fff",
+      fontFamily: "Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+      fontSize: 14,
+      fontWeight: 700,
+      padding: "10px 18px",
+      cursor: "pointer",
+      textTransform: "uppercase",
+    },
+
     progressWrap: { marginBottom: 18 },
     progressTrack: { width: "100%", height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden" },
     progressFill: { height: "100%", background: "#ec4899", width: `${progressPercent}%`, transition: "width 250ms ease" },
@@ -412,8 +490,10 @@ export default function NoShowCalculator() {
       textAlign: "center",
     },
 
-    cardTitle: { fontSize: 12, opacity: 0.9, margin: "0 0 6px 0", color: "#fff" },
-    cardValue: { fontSize: 32, fontWeight: 800, margin: 0, color: "#fff" }, // ✅ KPI immer weiß
+    cardTitle: { fontSize: 12, opacity: 0.9, margin: "0 0 6px 0" },
+
+    // KPI Zahl explizit weiß (damit nicht “grau” wirkt)
+    cardValue: { fontSize: 34, fontWeight: 800, margin: 0, color: "#ffffff" },
 
     grid2Media: `
       @media (min-width: 640px) {
@@ -422,17 +502,11 @@ export default function NoShowCalculator() {
     `,
   };
 
-  const renderField = (field, label, type = "text", options = null, extraProps = {}) => (
+  const renderField = (field, label, type = "text", options = null, extraInputProps = {}) => (
     <div key={field} style={S.field}>
       <label style={S.label}>{label}</label>
       {options ? (
-        <select
-          name={field}
-          value={formData[field]}
-          onChange={handleChange}
-          style={S.select(!!formErrors[field])}
-          {...extraProps}
-        >
+        <select name={field} value={formData[field]} onChange={handleChange} style={S.select(!!formErrors[field])}>
           {options.map((opt, i) => (
             <option key={i} value={opt}>
               {opt || "Bitte wählen"}
@@ -446,7 +520,7 @@ export default function NoShowCalculator() {
           value={formData[field]}
           onChange={handleChange}
           style={S.input(!!formErrors[field])}
-          {...extraProps}
+          {...extraInputProps}
         />
       )}
       {formErrors[field] && <p style={S.error}>Bitte ausfüllen.</p>}
@@ -471,7 +545,9 @@ export default function NoShowCalculator() {
       {!showResult && step === 1 && (
         <>
           <h2 style={S.h2}>Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
-          <p style={S.p}>Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.</p>
+          <p style={S.p}>
+            Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.
+          </p>
 
           {/* 1 */}
           <div style={S.field}>
@@ -482,6 +558,7 @@ export default function NoShowCalculator() {
               value={formData.reservationsPerDay}
               onChange={handleChange}
               style={S.input(!!formErrors.reservationsPerDay)}
+              inputMode="numeric"
             />
             {formErrors.reservationsPerDay && <p style={S.error}>Bitte ausfüllen.</p>}
             <p style={S.helper}>
@@ -521,6 +598,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={{ width: "100%" }}
+                onPointerDown={blurActiveTextInput}
+                onTouchStart={blurActiveTextInput}
+                onMouseDown={blurActiveTextInput}
               />
             </div>
 
@@ -539,6 +619,7 @@ export default function NoShowCalculator() {
               value={formData.noShowGuestsLast30Days}
               onChange={handleChange}
               style={S.input(!!formErrors.noShowGuestsLast30Days)}
+              inputMode="numeric"
             />
             {formErrors.noShowGuestsLast30Days && <p style={S.error}>Bitte ausfüllen.</p>}
             <p style={S.helper}>Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen.</p>
@@ -557,12 +638,13 @@ export default function NoShowCalculator() {
 
           {renderField("restaurantType", "Um welche Art von Restaurant handelt es sich?", "text", restaurantTypeOptions)}
 
-          {/* ✅ openDays min/max */}
-          {renderField("openDays", "Anzahl Tage pro Woche geöffnet (z. B. 5)", "number", null, {
-            min: 1,
-            max: 7,
-            inputMode: "numeric",
-          })}
+          {renderField(
+            "openDays",
+            "Anzahl Tage pro Woche geöffnet (max. 7)",
+            "number",
+            null,
+            { min: 0, max: 7, inputMode: "numeric" }
+          )}
 
           {/* Slider Umsatz */}
           <div style={{ marginBottom: 32 }}>
@@ -595,6 +677,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={{ width: "100%" }}
+                onPointerDown={blurActiveTextInput}
+                onTouchStart={blurActiveTextInput}
+                onMouseDown={blurActiveTextInput}
               />
             </div>
 
@@ -610,7 +695,7 @@ export default function NoShowCalculator() {
           )}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button type="button" onClick={() => (setStep(1), afterStepChangeScroll())} style={S.btnSecondary}>
+            <button type="button" onClick={() => { blurActiveTextInput(); setStep(1); afterStepChangeScroll(); }} style={S.btnSecondary}>
               Zurück
             </button>
             <button type="button" onClick={goFromStep2} style={S.btnPrimary}>
@@ -630,15 +715,13 @@ export default function NoShowCalculator() {
           {renderField("feeForNoShow", "Werden No-Show-Gebühren erhoben?", "text", ["", "Ja", "Nein"])}
 
           {formData.feeForNoShow === "Ja" &&
-            renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number")}
+            renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number", null, { inputMode: "numeric" })}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button type="button" onClick={() => (setStep(2), afterStepChangeScroll())} style={S.btnSecondary}>
+            <button type="button" onClick={() => { blurActiveTextInput(); setStep(2); afterStepChangeScroll(); }} style={S.btnSecondary}>
               Zurück
             </button>
-
-            {/* ✅ nicht grün -> pink */}
-            <button type="button" onClick={goFromStep3} style={S.btnPrimary}>
+            <button type="button" onClick={goFromStep3} style={S.btnPinkAlt}>
               Auswertung anzeigen
             </button>
           </div>
@@ -648,9 +731,7 @@ export default function NoShowCalculator() {
       {/* RESULT */}
       {showResult && (
         <>
-          <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 28, marginTop: 8, fontWeight: 700 }}>
-            Deine Auswertung
-          </h2>
+          <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 28, marginTop: 8 }}>Deine Auswertung</h2>
 
           <div className="ns-grid-2" style={{ ...S.grid2, marginBottom: 24 }}>
             <div style={S.card}>
@@ -672,21 +753,38 @@ export default function NoShowCalculator() {
                 Möchtest du eine detaillierte Auswertung als PDF inkl. konkreter Handlungsempfehlungen für dein Restaurant erhalten?
               </p>
 
-              <button type="button" onClick={() => setShowContactForm(true)} style={S.btnPrimary}>
+              <button
+                type="button"
+                onClick={() => {
+                  blurActiveTextInput();
+                  setShowContactForm(true);
+                }}
+                style={S.btnPrimary}
+              >
                 Ja, PDF-Report erhalten
               </button>
             </div>
           )}
 
           {showContactForm && !submissionSuccess && (
-            <form
-              ref={contactFormRef}
-              onSubmit={handleSubmit}
-              style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18 }}
-            >
+            <form ref={contactFormRef} onSubmit={handleSubmit} style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-                <input name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Vorname" style={S.input(false)} required />
-                <input name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Nachname" style={S.input(false)} required />
+                <input
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  placeholder="Vorname"
+                  style={S.input(false)}
+                  required
+                />
+                <input
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Nachname"
+                  style={S.input(false)}
+                  required
+                />
               </div>
 
               <div style={{ height: 12 }} />
@@ -748,7 +846,9 @@ export default function NoShowCalculator() {
                 </button>
 
                 {submissionStatus === "error" && (
-                  <p style={{ marginTop: 10, color: "#dc2626", fontSize: 13 }}>Fehler beim Senden. Bitte versuche es später erneut.</p>
+                  <p style={{ marginTop: 10, color: "#dc2626", fontSize: 13 }}>
+                    Fehler beim Senden. Bitte versuche es später erneut.
+                  </p>
                 )}
               </div>
             </form>
