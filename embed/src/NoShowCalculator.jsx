@@ -57,6 +57,22 @@ export default function NoShowCalculator() {
   );
 
   // ------------------------------------------------------------
+  // Shadow-DOM aware: wirklich fokussiertes Element finden
+  // (document.activeElement zeigt im Shadow DOM oft nur auf den Host)
+  // ------------------------------------------------------------
+  const getDeepActiveElement = () => {
+    try {
+      let el = document.activeElement;
+      while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+        el = el.shadowRoot.activeElement;
+      }
+      return el;
+    } catch {
+      return document.activeElement;
+    }
+  };
+
+  // ------------------------------------------------------------
   // Keyboard / VisualViewport -> --kb Padding + defensives Focus-Scrollen
   // ------------------------------------------------------------
   useEffect(() => {
@@ -126,22 +142,11 @@ export default function NoShowCalculator() {
   }, []);
 
   // ------------------------------------------------------------
-  // Helpers: keyboard offen?
+  // Blur helper (Shadow DOM aware)
   // ------------------------------------------------------------
-  const isKeyboardOpen = () => {
-    try {
-      const vv = window.visualViewport;
-      if (!vv) return false;
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      return kb > 0;
-    } catch {
-      return false;
-    }
-  };
-
   const blurTextInputIfAny = useCallback(() => {
     try {
-      const el = document.activeElement;
+      const el = getDeepActiveElement();
       if (!el) return;
 
       const tag = el.tagName?.toLowerCase();
@@ -155,101 +160,83 @@ export default function NoShowCalculator() {
   }, []);
 
   // ------------------------------------------------------------
-// FIX #3 (ANDROID/CHROME ROBUST):
-// - Blur, sobald irgendwo im Dokument gescrollt wird (Capture! auch für scroll-container)
-// - Blur bei pointerdown/touchstart, wenn Keyboard offen und ein Text-Input fokussiert ist
-//   (Slider/range ist explizit erlaubt als Target -> dann bluren wir den Text-Input)
-// ------------------------------------------------------------
-useEffect(() => {
-  const isKbOpen = () => {
-    try {
-      const vv = window.visualViewport;
-      if (!vv) return false;
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      return kb > 0;
-    } catch {
-      return false;
-    }
-  };
+  // FIX #3: Android/Chrome Jump verhindern
+  // -> Blur wenn Keyboard offen + (scroll oder pointerdown/touchstart außerhalb Textinputs)
+  // (inkl. Shadow DOM)
+  // ------------------------------------------------------------
+  useEffect(() => {
+    const isKbOpen = () => {
+      try {
+        const vv = window.visualViewport;
+        if (!vv) return false;
+        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        return kb > 0;
+      } catch {
+        return false;
+      }
+    };
 
-  const isTextLikeInput = (el) => {
-    if (!el) return false;
-    const tag = el.tagName?.toLowerCase();
-    if (tag !== "input" && tag !== "textarea" && tag !== "select") return false;
-    const type = el.getAttribute?.("type")?.toLowerCase();
-    // range NIE als "Text input" behandeln
-    if (type === "range") return false;
-    return true;
-  };
+    const isTextLikeInput = (el) => {
+      if (!el) return false;
+      const tag = el.tagName?.toLowerCase();
+      if (tag !== "input" && tag !== "textarea" && tag !== "select") return false;
+      const type = el.getAttribute?.("type")?.toLowerCase();
+      if (type === "range") return false;
+      return true;
+    };
 
-  const shouldBlurNow = (eventTarget) => {
-    if (!isKbOpen()) return false;
+    const shouldBlurNow = (eventTarget) => {
+      if (!isKbOpen()) return false;
 
-    const active = document.activeElement;
-    if (!isTextLikeInput(active)) return false;
+      const active = getDeepActiveElement();
+      if (!isTextLikeInput(active)) return false;
 
-    // Wenn der User in dasselbe aktive Feld tippt -> nicht blur
-    if (eventTarget === active) return false;
+      // Tippt der User wieder ins gleiche Feld -> nicht blur
+      if (eventTarget === active) return false;
 
-    // Wenn der User auf ein anderes Textfeld tippt -> nicht blur (sonst nervig)
-    const tTag = eventTarget?.tagName?.toLowerCase?.();
-    const tType = eventTarget?.getAttribute?.("type")?.toLowerCase?.();
+      // Tippt der User in ein anderes Textfeld -> nicht blur (sonst nervig)
+      const t = eventTarget;
+      const tTag = t?.tagName?.toLowerCase?.();
+      const tType = t?.getAttribute?.("type")?.toLowerCase?.();
+      const targetIsTextLike = (tTag === "input" && tType !== "range") || tTag === "textarea" || tTag === "select";
+      if (targetIsTextLike) return false;
 
-    const targetIsTextLike =
-      (tTag === "input" && tType !== "range") || tTag === "textarea" || tTag === "select";
+      // Slider/range ist erlaubt -> dann wollen wir blur
+      return true;
+    };
 
-    if (targetIsTextLike) return false;
+    const blurActive = () => {
+      try {
+        const a = getDeepActiveElement();
+        if (isTextLikeInput(a)) a.blur?.();
+      } catch {}
+    };
 
-    // WICHTIG: Range/Slider ist erlaubt -> dann WOLLEN wir blur
-    return true;
-  };
+    let raf = 0;
+    const scheduleBlur = (target) => {
+      if (!shouldBlurNow(target)) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => blurActive());
+    };
 
-  const blurActive = () => {
-    try {
-      const a = document.activeElement;
-      if (isTextLikeInput(a)) a.blur?.();
-    } catch {}
-  };
+    const onAnyScrollCapture = (e) => scheduleBlur(e.target);
+    const onPointerDownCapture = (e) => scheduleBlur(e.target?.closest?.("*") || e.target);
+    const onTouchStartCapture = (e) => scheduleBlur(e.target?.closest?.("*") || e.target);
 
-  let raf = 0;
-  const scheduleBlur = (target) => {
-    if (!shouldBlurNow(target)) return;
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => blurActive());
-  };
+    document.addEventListener("scroll", onAnyScrollCapture, true);
+    document.addEventListener("pointerdown", onPointerDownCapture, true);
+    document.addEventListener("touchstart", onTouchStartCapture, true);
 
-  // 1) Scroll auf JEDEM Element im Dokument (capture=true) -> blur
-  const onAnyScrollCapture = (e) => {
-    scheduleBlur(e.target);
-  };
-
-  // 2) Früher als onClick: pointerdown/touchstart capture -> blur
-  const onPointerDownCapture = (e) => {
-    // closest() ist wichtig, weil oft span/div im Slider/Label getroffen wird
-    const t = e.target?.closest?.("*") || e.target;
-    scheduleBlur(t);
-  };
-
-  const onTouchStartCapture = (e) => {
-    const t = e.target?.closest?.("*") || e.target;
-    scheduleBlur(t);
-  };
-
-  document.addEventListener("scroll", onAnyScrollCapture, true);
-  document.addEventListener("pointerdown", onPointerDownCapture, true);
-  document.addEventListener("touchstart", onTouchStartCapture, true);
-
-  return () => {
-    cancelAnimationFrame(raf);
-    document.removeEventListener("scroll", onAnyScrollCapture, true);
-    document.removeEventListener("pointerdown", onPointerDownCapture, true);
-    document.removeEventListener("touchstart", onTouchStartCapture, true);
-  };
-}, []);
-
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("scroll", onAnyScrollCapture, true);
+      document.removeEventListener("pointerdown", onPointerDownCapture, true);
+      document.removeEventListener("touchstart", onTouchStartCapture, true);
+    };
+  }, []);
 
   // ------------------------------------------------------------
-  // Range Interaction: zusätzlich stabilisieren (falls iOS trotzdem kurz springt)
+  // Range Interaction: zusätzlich stabilisieren (falls es trotzdem kurz springt)
   // ------------------------------------------------------------
   const stabilizeRangeStart = useCallback(() => {
     try {
@@ -320,7 +307,6 @@ useEffect(() => {
     if (!showContactForm || !contactFormRef.current) return;
 
     scrollToEmbedTop("smooth");
-
     setTimeout(() => {
       scrollToElWithOffset(contactFormRef.current, "smooth", 8);
     }, 220);
@@ -482,7 +468,10 @@ useEffect(() => {
       "protonmail.com",
       "aol.com",
     ];
-    const match = String(email || "").trim().toLowerCase().match(/@([^@]+)$/);
+    const match = String(email || "")
+      .trim()
+      .toLowerCase()
+      .match(/@([^@]+)$/);
     if (!match) return false;
     return !freeDomains.includes(match[1]);
   };
@@ -545,7 +534,9 @@ useEffect(() => {
     }
   };
 
-  // Fortschrittsbalken
+  // ------------------------------------------------------------
+  // Progress (NUR EINMAL deklarieren -> Build-Fix)
+  // ------------------------------------------------------------
   const totalSteps = 4;
   const currentStepForProgress = showResult ? 4 : step;
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
@@ -625,7 +616,7 @@ useEffect(() => {
 
     progressWrap: { marginBottom: 18 },
     progressTrack: { width: "100%", height: 8, background: "#e5e7eb", borderRadius: 999, overflow: "hidden" },
-    progressFill: { height: "100%", background: "#ec4899", width: `${progressPercent}%`, transition: "width 250ms ease" },
+    progressFill: { height: "100%", background: "#ec4899", transition: "width 250ms ease" },
     progressText: { marginTop: 6, fontSize: 12, color: "#6b7280", textAlign: "right" },
 
     grid2: {
@@ -670,21 +661,24 @@ useEffect(() => {
     </div>
   );
 
+  // Pink slider “failsafe”
   const pinkRangeStyle = { width: "100%", accentColor: "#ec4899" };
 
   return (
     <div id="no-show-calculator" ref={wrapperRef} style={S.wrapper}>
       <style>{S.grid2Media}</style>
 
+      {/* Progress */}
       <div ref={progressWrapRef} style={S.progressWrap}>
         <div style={S.progressTrack}>
-          <div style={S.progressFill} />
+          <div style={{ ...S.progressFill, width: `${progressPercent}%` }} />
         </div>
         <div style={S.progressText}>
           Schritt {currentStepForProgress} von {totalSteps}
         </div>
       </div>
 
+      {/* STEP 1 */}
       {!showResult && step === 1 && (
         <>
           <h2 style={S.h2}>Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
@@ -767,6 +761,7 @@ useEffect(() => {
         </>
       )}
 
+      {/* STEP 2 */}
       {!showResult && step === 2 && (
         <>
           <h2 style={S.h2Small}>Angaben zu deinem Restaurant</h2>
@@ -839,6 +834,7 @@ useEffect(() => {
         </>
       )}
 
+      {/* STEP 3 */}
       {!showResult && step === 3 && formData.hasOnlineReservation === "Ja" && (
         <>
           <h2 style={S.h2Small}>Details zum Reservierungssystem</h2>
@@ -867,6 +863,7 @@ useEffect(() => {
         </>
       )}
 
+      {/* RESULT */}
       {showResult && (
         <>
           <h2 style={{ ...S.h2Small, textAlign: "center", fontSize: 28, marginTop: 8, fontWeight: 700 }}>Deine Auswertung</h2>
@@ -981,7 +978,16 @@ useEffect(() => {
           )}
 
           {submissionSuccess && (
-            <div style={{ textAlign: "center", background: "#dcfce7", border: "1px solid #86efac", padding: 18, borderRadius: 16, marginTop: 16 }}>
+            <div
+              style={{
+                textAlign: "center",
+                background: "#dcfce7",
+                border: "1px solid #86efac",
+                padding: 18,
+                borderRadius: 16,
+                marginTop: 16,
+              }}
+            >
               <h2 style={{ margin: "0 0 6px 0", fontSize: 18, fontWeight: 800, color: "#166534" }}>Vielen Dank!</h2>
               <p style={{ margin: 0, color: "#166534" }}>Dein No-Show-Report wurde erfolgreich per E-Mail versendet.</p>
             </div>
