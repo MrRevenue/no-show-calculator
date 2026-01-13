@@ -31,9 +31,10 @@ export default function NoShowCalculator() {
 
   const wrapperRef = useRef(null);
   const contactFormRef = useRef(null);
+  const progressWrapRef = useRef(null);
 
   // ------------------------------------------------------------
-  // Scroll helpers: zuverlässig im HubSpot-Kontext (Sticky Header)
+  // Scroll helpers (Sticky Header)
   // ------------------------------------------------------------
   const HEADER_OFFSET = 110;
 
@@ -56,14 +57,11 @@ export default function NoShowCalculator() {
   );
 
   // ------------------------------------------------------------
-  // Keyboard / VisualViewport
-  // - setzt --kb fürs padding
-  // - KEIN aggressives Auto-Scrollen mehr (verhindert "hochspringen")
+  // Keyboard / VisualViewport -> --kb Padding + defensives Focus-Scrollen
   // ------------------------------------------------------------
   useEffect(() => {
     const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
-    // VisualViewport -> kb padding
     const vv = window.visualViewport;
     let cleanupVv = null;
 
@@ -90,8 +88,8 @@ export default function NoShowCalculator() {
       };
     }
 
-    // Sehr defensives Focus-Scrollen (nur wenn wirklich vom Keyboard verdeckt)
-    // Wichtig: NICHT für range; sonst springt es beim Slider.
+    // Defensiv: nur scrollIntoView wenn Keyboard offen & Element wirklich verdeckt
+    // range NIE auto-scrollen
     let onFocusIn;
     if (!isInIframe) {
       onFocusIn = (e) => {
@@ -101,14 +99,12 @@ export default function NoShowCalculator() {
         const tag = el.tagName?.toLowerCase();
         if (!["input", "textarea", "select"].includes(tag)) return;
 
-        // range NIE auto-scrollen (führt zu Sprüngen)
         const type = el.getAttribute?.("type")?.toLowerCase();
         if (type === "range") return;
 
         const kb = getKb();
-        if (!kb) return; // keyboard nicht offen -> nix tun
+        if (!kb) return;
 
-        // Wenn Element unten vom Keyboard überdeckt wäre -> sanft in Sicht bringen
         setTimeout(() => {
           try {
             const r = el.getBoundingClientRect();
@@ -130,8 +126,7 @@ export default function NoShowCalculator() {
   }, []);
 
   // ------------------------------------------------------------
-  // Range Interaction: wenn Keyboard offen & ein Input fokussiert ist,
-  // Input blur() damit Slider nicht "hochspringt"
+  // Blur helper (nur Text/Select/Textarea; NICHT range)
   // ------------------------------------------------------------
   const blurTextInputIfAny = useCallback(() => {
     try {
@@ -148,14 +143,91 @@ export default function NoShowCalculator() {
     } catch {}
   }, []);
 
+  // ------------------------------------------------------------
+  // Fix #3 (robust): Range-Interaktion stabilisieren (iOS Jump verhindern)
+  // Merkt scrollY, blurt Fokus, setzt Scroll danach wieder zurück (RAF + Timeout)
+  // ------------------------------------------------------------
+  const stabilizeRangeStart = useCallback(() => {
+    try {
+      const y = window.scrollY || 0;
+
+      blurTextInputIfAny();
+
+      // iOS "zieht" manchmal sofort hoch -> wir klemmen es wieder fest
+      requestAnimationFrame(() => {
+        try {
+          window.scrollTo({ top: y, behavior: "auto" });
+        } catch {}
+      });
+
+      setTimeout(() => {
+        try {
+          window.scrollTo({ top: y, behavior: "auto" });
+        } catch {}
+      }, 80);
+    } catch {}
+  }, [blurTextInputIfAny]);
+
+  // ------------------------------------------------------------
+  // Fix #2 (robust): HubSpot Hero-CTA / Anchor scrollt oft ohne hashchange
+  // -> Klick auf Anker abfangen, Default verhindern, selbst sauber scrollen
+  // ------------------------------------------------------------
+  useEffect(() => {
+    const onDocClickCapture = (e) => {
+      try {
+        const target = e.target;
+        if (!target) return;
+
+        const a = target.closest?.("a[href^='#']");
+        if (!a) return;
+
+        const href = a.getAttribute("href") || "";
+        if (!href.startsWith("#")) return;
+
+        const id = href.replace("#", "");
+        if (!id) return;
+
+        // wenn du weitere IDs hast (z.B. "#calculator"), hier ergänzen:
+        const allowed = new Set(["no-show-calculator"]);
+        if (!allowed.has(id)) return;
+
+        const container = wrapperRef.current || document.getElementById("no-show-calculator");
+        if (!container) return;
+
+        // Default-Anchor-Scroll verhindern (sonst landet man zu tief)
+        e.preventDefault();
+
+        // Fokus raus (Mobile)
+        blurTextInputIfAny();
+
+        // Offset so, dass Progress sichtbar bleibt:
+        const progressH = progressWrapRef.current?.getBoundingClientRect?.().height || 0;
+        const extraOffset = Math.max(48, progressH + 12);
+
+        // Optional: Hash trotzdem setzen (für URL/Back Button)
+        // (ohne nochmal scrollen zu triggern)
+        try {
+          history.replaceState(null, "", `#${id}`);
+        } catch {}
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollToElWithOffset(container, "smooth", extraOffset);
+          });
+        });
+      } catch {}
+    };
+
+    document.addEventListener("click", onDocClickCapture, true);
+    return () => document.removeEventListener("click", onDocClickCapture, true);
+  }, [blurTextInputIfAny, scrollToElWithOffset]);
+
   // Wenn Contact-Form aufgeht: bewusst scrollen (CTA)
   useEffect(() => {
     if (!showContactForm || !contactFormRef.current) return;
 
-    // 1) Zum Embed-Top (damit Progress sichtbar bleibt)
     scrollToEmbedTop("smooth");
 
-    // 2) Dann zum Formular, aber mit Sticky-Header-Offset (damit nichts unter die Nav rutscht)
     setTimeout(() => {
       scrollToElWithOffset(contactFormRef.current, "smooth", 8);
     }, 220);
@@ -165,7 +237,6 @@ export default function NoShowCalculator() {
     const { name, value, type, checked } = e.target;
     let newValue = type === "checkbox" ? checked : value;
 
-    // ✅ openDays clamp auf 1..7
     if (name === "openDays") {
       const n = Number(newValue);
       if (Number.isFinite(n)) newValue = String(Math.min(7, Math.max(1, n)));
@@ -204,7 +275,6 @@ export default function NoShowCalculator() {
     return Object.keys(errors).length === 0;
   };
 
-  // ✅ Nach Step-Wechsel: nach oben (inkl. Progressbar) – stabil bei HubSpot Layout/Fonts
   const afterStepChangeScroll = () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -329,7 +399,6 @@ export default function NoShowCalculator() {
 
     if (!acceptedPolicy) {
       setShowPolicyError(true);
-      // Formular sichtbar halten und sicherstellen, dass es nicht unter Nav sitzt
       requestAnimationFrame(() => scrollToElWithOffset(contactFormRef.current, "smooth", 8));
       return;
     }
@@ -370,7 +439,6 @@ export default function NoShowCalculator() {
         setSubmissionSuccess(true);
         setShowForm(false);
         setSubmissionStatus("success");
-        // nach Erfolg leicht nach oben, so dass die Success-Box im Fokus ist
         requestAnimationFrame(() => scrollToEmbedTop("smooth"));
       } else {
         console.error("❌ Fehler beim Versand:", result.error || "Unbekannter Fehler");
@@ -397,7 +465,6 @@ export default function NoShowCalculator() {
       padding: "24px",
       paddingBottom: "calc(var(--kb, 0px) + 24px)",
       color: "#111827",
-      // wichtig für Anchor-/ScrollTo, damit Sticky Header nichts verdeckt
       scrollMarginTop: HEADER_OFFSET,
     },
 
@@ -523,18 +590,15 @@ export default function NoShowCalculator() {
     </div>
   );
 
-  // pink slider “failsafe” (falls Browser/CSS mal nicht greift)
-  const pinkRangeStyle = {
-    width: "100%",
-    accentColor: "#ec4899",
-  };
+  // Pink slider “failsafe” (falls Browser/CSS mal nicht greift)
+  const pinkRangeStyle = { width: "100%", accentColor: "#ec4899" };
 
   return (
     <div id="no-show-calculator" ref={wrapperRef} style={S.wrapper}>
       <style>{S.grid2Media}</style>
 
       {/* Progress */}
-      <div style={S.progressWrap}>
+      <div ref={progressWrapRef} style={S.progressWrap}>
         <div style={S.progressTrack}>
           <div style={S.progressFill} />
         </div>
@@ -549,7 +613,6 @@ export default function NoShowCalculator() {
           <h2 style={S.h2}>Berechne deine No-Show-Rate und deinen monatlichen Umsatzverlust</h2>
           <p style={S.p}>Beantworte kurz diese Fragen – die Berechnung erfolgt sofort und basiert auf deinen Reservierungen.</p>
 
-          {/* 1 */}
           <div style={S.field}>
             <label style={S.label}>Ø Reservierungen pro Öffnungstag (alle Kanäle, z. B. 40)</label>
             <input
@@ -566,7 +629,6 @@ export default function NoShowCalculator() {
             </p>
           </div>
 
-          {/* 2 Slider Gäste */}
           <div style={{ marginBottom: 32 }}>
             <label style={{ ...S.label, marginBottom: 14 }}>Ø Gäste pro Reservierung (z. B. 2,0 Personen)</label>
 
@@ -597,8 +659,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={pinkRangeStyle}
-                onPointerDown={blurTextInputIfAny}
-                onTouchStart={blurTextInputIfAny}
+                onMouseDown={stabilizeRangeStart}
+                onPointerDown={stabilizeRangeStart}
+                onTouchStart={stabilizeRangeStart}
               />
             </div>
 
@@ -606,7 +669,6 @@ export default function NoShowCalculator() {
             {formErrors.avgGuestsPerReservation && <p style={S.error}>Bitte ausfüllen.</p>}
           </div>
 
-          {/* 3 */}
           <div style={S.field}>
             <label style={S.label}>
               Wie viele Personen sind in den letzten 30 Tagen trotz Reservierung ohne rechtzeitige Absage nicht erschienen? (Schätzung)
@@ -635,14 +697,12 @@ export default function NoShowCalculator() {
 
           {renderField("restaurantType", "Um welche Art von Restaurant handelt es sich?", "text", restaurantTypeOptions)}
 
-          {/* ✅ openDays min/max */}
           {renderField("openDays", "Anzahl Tage pro Woche geöffnet (z. B. 5)", "number", null, {
             min: 1,
             max: 7,
             inputMode: "numeric",
           })}
 
-          {/* Slider Umsatz */}
           <div style={{ marginBottom: 32 }}>
             <label style={{ ...S.label, marginBottom: 14 }}>Ø Umsatz pro Gast ({currency})</label>
 
@@ -673,8 +733,9 @@ export default function NoShowCalculator() {
                 onChange={handleChange}
                 className="pink-slider"
                 style={pinkRangeStyle}
-                onPointerDown={blurTextInputIfAny}
-                onTouchStart={blurTextInputIfAny}
+                onMouseDown={stabilizeRangeStart}
+                onPointerDown={stabilizeRangeStart}
+                onTouchStart={stabilizeRangeStart}
               />
             </div>
 
@@ -682,12 +743,7 @@ export default function NoShowCalculator() {
             {formErrors.averageSpend && <p style={S.error}>Bitte ausfüllen.</p>}
           </div>
 
-          {renderField(
-            "hasOnlineReservation",
-            "Ist für das Restaurant ein Online-Reservierungssystem im Einsatz?",
-            "text",
-            ["", "Ja", "Nein"]
-          )}
+          {renderField("hasOnlineReservation", "Ist für das Restaurant ein Online-Reservierungssystem im Einsatz?", "text", ["", "Ja", "Nein"])}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
             <button
@@ -713,7 +769,6 @@ export default function NoShowCalculator() {
           <h2 style={S.h2Small}>Details zum Reservierungssystem</h2>
 
           {renderField("reservationTool", "Welches Reservierungssystem ist aktuell im Einsatz?", "text", reservationToolOptions)}
-
           {renderField("feeForNoShow", "Werden No-Show-Gebühren erhoben?", "text", ["", "Ja", "Nein"])}
 
           {formData.feeForNoShow === "Ja" && renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number")}
@@ -765,7 +820,6 @@ export default function NoShowCalculator() {
               <button
                 type="button"
                 onClick={() => {
-                  // verhindert, dass noch ein Input irgendwo fokussiert ist
                   blurTextInputIfAny();
                   setShowContactForm(true);
                 }}
