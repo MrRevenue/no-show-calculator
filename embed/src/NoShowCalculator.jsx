@@ -34,10 +34,14 @@ export default function NoShowCalculator() {
   const progressWrapRef = useRef(null);
 
   // ------------------------------------------------------------
-  // Scroll helpers (Sticky Header)
+  // Config
   // ------------------------------------------------------------
   const HEADER_OFFSET = 110;
+  const MAX_GUESTS_PER_RES = 10;
 
+  // ------------------------------------------------------------
+  // Scroll helpers (Sticky Header)
+  // ------------------------------------------------------------
   const scrollToElWithOffset = useCallback((el, behavior = "smooth", extraOffset = 0) => {
     try {
       if (!el) return;
@@ -58,7 +62,6 @@ export default function NoShowCalculator() {
 
   // ------------------------------------------------------------
   // Shadow-DOM aware: wirklich fokussiertes Element finden
-  // (document.activeElement zeigt im Shadow DOM oft nur auf den Host)
   // ------------------------------------------------------------
   const getDeepActiveElement = () => {
     try {
@@ -104,14 +107,12 @@ export default function NoShowCalculator() {
       };
     }
 
-    // Defensiv: nur scrollIntoView wenn Keyboard offen & Element wirklich verdeckt
-    // range NIE auto-scrollen
+    // Wichtig: NICHT aggressiv scrollIntoView auf Android, nur wenn wirklich verdeckt
     let onFocusIn;
     if (!isInIframe) {
       onFocusIn = (e) => {
         const el = e.target;
         if (!el) return;
-
         const tag = el.tagName?.toLowerCase();
         if (!["input", "textarea", "select"].includes(tag)) return;
 
@@ -129,9 +130,8 @@ export default function NoShowCalculator() {
               el.scrollIntoView({ block: "center", behavior: "smooth" });
             }
           } catch {}
-        }, 50);
+        }, 80);
       };
-
       window.addEventListener("focusin", onFocusIn);
     }
 
@@ -142,8 +142,19 @@ export default function NoShowCalculator() {
   }, []);
 
   // ------------------------------------------------------------
-  // Blur helper (Shadow DOM aware)
+  // Helpers
   // ------------------------------------------------------------
+  const isKeyboardOpen = () => {
+    try {
+      const vv = window.visualViewport;
+      if (!vv) return false;
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      return kb > 0;
+    } catch {
+      return false;
+    }
+  };
+
   const blurTextInputIfAny = useCallback(() => {
     try {
       const el = getDeepActiveElement();
@@ -159,84 +170,33 @@ export default function NoShowCalculator() {
     } catch {}
   }, []);
 
+  const toNonNegativeNumberString = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "";
+    return String(Math.max(0, n));
+  };
+
+  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
   // ------------------------------------------------------------
-  // FIX #3: Android/Chrome Jump verhindern
-  // -> Blur wenn Keyboard offen + (scroll oder pointerdown/touchstart außerhalb Textinputs)
-  // (inkl. Shadow DOM)
+  // FIX: Keyboard “blitzt” beim ersten Tap
+  // -> KEIN globales blur auf pointerdown/touchstart!
+  // -> blur nur beim Scroll (wenn KB offen), damit Slider nicht nach oben springt.
   // ------------------------------------------------------------
   useEffect(() => {
-    const isKbOpen = () => {
-      try {
-        const vv = window.visualViewport;
-        if (!vv) return false;
-        const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-        return kb > 0;
-      } catch {
-        return false;
-      }
+    const onAnyScrollCapture = () => {
+      if (!isKeyboardOpen()) return;
+      // Wenn User scrollt, schließen wir bewusst das Keyboard
+      // (damit späterer Slider-Tap keinen Focus-Restore auslöst)
+      blurTextInputIfAny();
     };
-
-    const isTextLikeInput = (el) => {
-      if (!el) return false;
-      const tag = el.tagName?.toLowerCase();
-      if (tag !== "input" && tag !== "textarea" && tag !== "select") return false;
-      const type = el.getAttribute?.("type")?.toLowerCase();
-      if (type === "range") return false;
-      return true;
-    };
-
-    const shouldBlurNow = (eventTarget) => {
-      if (!isKbOpen()) return false;
-
-      const active = getDeepActiveElement();
-      if (!isTextLikeInput(active)) return false;
-
-      // Tippt der User wieder ins gleiche Feld -> nicht blur
-      if (eventTarget === active) return false;
-
-      // Tippt der User in ein anderes Textfeld -> nicht blur (sonst nervig)
-      const t = eventTarget;
-      const tTag = t?.tagName?.toLowerCase?.();
-      const tType = t?.getAttribute?.("type")?.toLowerCase?.();
-      const targetIsTextLike = (tTag === "input" && tType !== "range") || tTag === "textarea" || tTag === "select";
-      if (targetIsTextLike) return false;
-
-      // Slider/range ist erlaubt -> dann wollen wir blur
-      return true;
-    };
-
-    const blurActive = () => {
-      try {
-        const a = getDeepActiveElement();
-        if (isTextLikeInput(a)) a.blur?.();
-      } catch {}
-    };
-
-    let raf = 0;
-    const scheduleBlur = (target) => {
-      if (!shouldBlurNow(target)) return;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => blurActive());
-    };
-
-    const onAnyScrollCapture = (e) => scheduleBlur(e.target);
-    const onPointerDownCapture = (e) => scheduleBlur(e.target?.closest?.("*") || e.target);
-    const onTouchStartCapture = (e) => scheduleBlur(e.target?.closest?.("*") || e.target);
 
     document.addEventListener("scroll", onAnyScrollCapture, true);
-    document.addEventListener("pointerdown", onPointerDownCapture, true);
-    document.addEventListener("touchstart", onTouchStartCapture, true);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener("scroll", onAnyScrollCapture, true);
-      document.removeEventListener("pointerdown", onPointerDownCapture, true);
-      document.removeEventListener("touchstart", onTouchStartCapture, true);
-    };
-  }, []);
+    return () => document.removeEventListener("scroll", onAnyScrollCapture, true);
+  }, [blurTextInputIfAny]);
 
   // ------------------------------------------------------------
-  // Range Interaction: zusätzlich stabilisieren (falls es trotzdem kurz springt)
+  // Range Interaction: gezielt stabilisieren (Slider)
   // ------------------------------------------------------------
   const stabilizeRangeStart = useCallback(() => {
     try {
@@ -244,17 +204,17 @@ export default function NoShowCalculator() {
 
       blurTextInputIfAny();
 
+      // falls Browser trotzdem kurz korrigiert
       requestAnimationFrame(() => {
         try {
           window.scrollTo({ top: y, behavior: "auto" });
         } catch {}
       });
-
       setTimeout(() => {
         try {
           window.scrollTo({ top: y, behavior: "auto" });
         } catch {}
-      }, 80);
+      }, 60);
     } catch {}
   }, [blurTextInputIfAny]);
 
@@ -312,13 +272,55 @@ export default function NoShowCalculator() {
     }, 220);
   }, [showContactForm, scrollToEmbedTop, scrollToElWithOffset]);
 
+  // ------------------------------------------------------------
+  // Plausibilitäts-Caps
+  // - noShowGuestsLast30Days max = reservationsPerDay * 30 * MAX_GUESTS_PER_RES
+  // ------------------------------------------------------------
+  const reservationsPerDayNum = Math.max(0, Number(formData.reservationsPerDay || 0));
+  const maxNoShowGuestsCap = reservationsPerDayNum > 0 ? Math.floor(reservationsPerDayNum * 30 * MAX_GUESTS_PER_RES) : 0;
+
+  useEffect(() => {
+    // Wenn Reservierungen reduziert werden, clampen wir No-Shows nach unten
+    const current = Number(formData.noShowGuestsLast30Days || 0);
+    if (!Number.isFinite(current)) return;
+
+    const clamped = maxNoShowGuestsCap > 0 ? clamp(current, 0, maxNoShowGuestsCap) : 0;
+    if (String(clamped) !== String(formData.noShowGuestsLast30Days || "")) {
+      setFormData((prev) => ({ ...prev, noShowGuestsLast30Days: String(clamped) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxNoShowGuestsCap]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     let newValue = type === "checkbox" ? checked : value;
 
+    // Negative verhindern
+    const nonNegativeFields = [
+      "reservationsPerDay",
+      "noShowGuestsLast30Days",
+      "openDays",
+      "noShowFee",
+      "restaurantName", // irrelevant, aber harmless
+    ];
+
+    if (type === "number" && ["reservationsPerDay", "noShowGuestsLast30Days", "openDays", "noShowFee"].includes(name)) {
+      newValue = toNonNegativeNumberString(newValue);
+    }
+
+    // openDays clamp 1..7
     if (name === "openDays") {
       const n = Number(newValue);
       if (Number.isFinite(n)) newValue = String(Math.min(7, Math.max(1, n)));
+    }
+
+    // noShowGuests cap
+    if (name === "noShowGuestsLast30Days") {
+      const n = Number(newValue);
+      if (Number.isFinite(n)) {
+        const cap = maxNoShowGuestsCap;
+        newValue = String(cap > 0 ? clamp(n, 0, cap) : 0);
+      }
     }
 
     setFormData((prev) => ({ ...prev, [name]: newValue }));
@@ -418,31 +420,35 @@ export default function NoShowCalculator() {
 
   const currency = "€";
 
-  // --- Rechenlogik ---
-  const reservationsPerDay = +formData.reservationsPerDay || 0;
-  const avgGuestsPerReservation = +formData.avgGuestsPerReservation || 0;
-  const openDaysPerWeek = +formData.openDays || 0;
-  const avgSpendPerGuest = +formData.averageSpend || 0;
-  const noShowGuestsInput30 = +formData.noShowGuestsLast30Days || 0;
+  // --- Rechenlogik (30 Tage) ---
+  const reservationsPerDay = Math.max(0, Number(formData.reservationsPerDay || 0));
+  const avgGuestsPerReservation = Math.max(0, Number(formData.avgGuestsPerReservation || 0));
+  const openDaysPerWeek = Math.max(0, Number(formData.openDays || 0));
+  const avgSpendPerGuest = Math.max(0, Number(formData.averageSpend || 0));
+  const noShowGuestsInput30 = Math.max(0, Number(formData.noShowGuestsLast30Days || 0));
 
   const avgGuestsSliderValue = avgGuestsPerReservation || 2;
   const avgSpendSliderValue = avgSpendPerGuest || 50;
 
-  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (8 - 1)) * 100;
+  const avgGuestsPercent = ((avgGuestsSliderValue - 1) / (MAX_GUESTS_PER_RES - 1)) * 100;
   const avgSpendPercent = ((avgSpendSliderValue - 10) / (500 - 10)) * 100;
 
-  const noShowFeePerGuest = formData.feeForNoShow === "Ja" ? +formData.noShowFee || 0 : 0;
+  const noShowFeePerGuest = formData.feeForNoShow === "Ja" ? Math.max(0, Number(formData.noShowFee || 0)) : 0;
 
   const OPEN_DAYS_30 = openDaysPerWeek > 0 ? (openDaysPerWeek / 7) * 30 : 0;
   const totalReservations30 = reservationsPerDay * OPEN_DAYS_30;
   const totalGuests30 = totalReservations30 * avgGuestsPerReservation;
 
-  const noShowGuests30 = noShowGuestsInput30;
+  // Plausibel: No-Shows können nie höher als totalGuests30 sein
+  const noShowGuests30 = totalGuests30 > 0 ? Math.min(noShowGuestsInput30, totalGuests30) : 0;
+
   const noShowRate = totalGuests30 > 0 ? (noShowGuests30 / totalGuests30) * 100 : 0;
 
   const totalRevenue30 = totalGuests30 * avgSpendPerGuest;
-  const grossLoss30 = noShowGuests30 * avgSpendPerGuest;
-  const recoveredByFees30 = noShowGuests30 * noShowFeePerGuest;
+
+  // WICHTIG: wenn keine Gäste/Reservierungen -> Verlust 0
+  const grossLoss30 = totalGuests30 > 0 ? noShowGuests30 * avgSpendPerGuest : 0;
+  const recoveredByFees30 = totalGuests30 > 0 ? noShowGuests30 * noShowFeePerGuest : 0;
   const loss30 = Math.max(grossLoss30 - recoveredByFees30, 0);
 
   const upsell = totalRevenue30 * 0.05;
@@ -534,9 +540,7 @@ export default function NoShowCalculator() {
     }
   };
 
-  // ------------------------------------------------------------
-  // Progress (NUR EINMAL deklarieren -> Build-Fix)
-  // ------------------------------------------------------------
+  // Progress
   const totalSteps = 4;
   const currentStepForProgress = showResult ? 4 : step;
   const progressPercent = (currentStepForProgress / totalSteps) * 100;
@@ -550,6 +554,8 @@ export default function NoShowCalculator() {
       paddingBottom: "calc(var(--kb, 0px) + 24px)",
       color: "#111827",
       scrollMarginTop: HEADER_OFFSET,
+      overflowX: "hidden",
+      boxSizing: "border-box",
     },
 
     h2: { fontSize: 32, lineHeight: 1.15, margin: "8px 0 10px 0", fontWeight: 300 },
@@ -557,13 +563,15 @@ export default function NoShowCalculator() {
     p: { fontSize: 15, lineHeight: 1.45, color: "#4b5563", margin: "0 0 16px 0" },
 
     label: { display: "block", fontSize: 14, fontWeight: 600, color: "#374151", margin: "0 0 6px 0" },
-    helper: { fontSize: 12, color: "#6b7280", marginTop: 6 },
+    helper: { fontSize: 14, lineHeight: 1.45, color: "#6b7280", marginTop: 8 }, // ✅ größer
     error: { fontSize: 12, color: "#ec4899", marginTop: 6 },
 
     field: { marginBottom: 28 },
 
     input: (isError) => ({
       width: "100%",
+      maxWidth: "100%",
+      boxSizing: "border-box",
       fontSize: 16,
       lineHeight: 1.25,
       padding: "10px 12px",
@@ -576,6 +584,8 @@ export default function NoShowCalculator() {
 
     select: (isError) => ({
       width: "100%",
+      maxWidth: "100%",
+      boxSizing: "border-box",
       fontSize: 16,
       lineHeight: 1.25,
       padding: "10px 12px",
@@ -661,7 +671,6 @@ export default function NoShowCalculator() {
     </div>
   );
 
-  // Pink slider “failsafe”
   const pinkRangeStyle = { width: "100%", accentColor: "#ec4899" };
 
   return (
@@ -689,6 +698,8 @@ export default function NoShowCalculator() {
             <input
               name="reservationsPerDay"
               type="number"
+              min={0}
+              inputMode="numeric"
               value={formData.reservationsPerDay}
               onChange={handleChange}
               style={S.input(!!formErrors.reservationsPerDay)}
@@ -701,7 +712,9 @@ export default function NoShowCalculator() {
           </div>
 
           <div style={{ marginBottom: 32 }}>
-            <label style={{ ...S.label, marginBottom: 14 }}>Ø Gäste pro Reservierung (z. B. 2,0 Personen)</label>
+            <label style={{ ...S.label, marginBottom: 14 }}>
+              Ø Gäste pro Reservierung (max. {MAX_GUESTS_PER_RES})
+            </label>
 
             <div style={{ position: "relative", width: "100%" }}>
               <div
@@ -724,7 +737,7 @@ export default function NoShowCalculator() {
                 type="range"
                 name="avgGuestsPerReservation"
                 min="1"
-                max="8"
+                max={String(MAX_GUESTS_PER_RES)}
                 step="0.5"
                 value={avgGuestsSliderValue}
                 onChange={handleChange}
@@ -747,12 +760,18 @@ export default function NoShowCalculator() {
             <input
               name="noShowGuestsLast30Days"
               type="number"
+              min={0}
+              max={maxNoShowGuestsCap || 0}
+              inputMode="numeric"
               value={formData.noShowGuestsLast30Days}
               onChange={handleChange}
               style={S.input(!!formErrors.noShowGuestsLast30Days)}
             />
             {formErrors.noShowGuestsLast30Days && <p style={S.error}>Bitte ausfüllen.</p>}
-            <p style={S.helper}>Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen.</p>
+            <p style={S.helper}>
+              Bitte die geschätzte Gesamtzahl an Personen angeben, nicht die Anzahl der Reservierungen. Maximal möglich (aus Frage 1):{" "}
+              <strong>{maxNoShowGuestsCap.toLocaleString("de-DE")}</strong>
+            </p>
           </div>
 
           <button type="button" onClick={goFromStep1} style={S.btnPrimary}>
@@ -817,14 +836,7 @@ export default function NoShowCalculator() {
           {renderField("hasOnlineReservation", "Ist für das Restaurant ein Online-Reservierungssystem im Einsatz?", "text", ["", "Ja", "Nein"])}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setStep(1);
-                afterStepChangeScroll();
-              }}
-              style={S.btnSecondary}
-            >
+            <button type="button" onClick={() => (setStep(1), afterStepChangeScroll())} style={S.btnSecondary}>
               Zurück
             </button>
             <button type="button" onClick={goFromStep2} style={S.btnPrimary}>
@@ -840,22 +852,19 @@ export default function NoShowCalculator() {
           <h2 style={S.h2Small}>Details zum Reservierungssystem</h2>
 
           {renderField("reservationTool", "Welches Reservierungssystem ist aktuell im Einsatz?", "text", reservationToolOptions)}
+
           {renderField("feeForNoShow", "Werden No-Show-Gebühren erhoben?", "text", ["", "Ja", "Nein"])}
 
-          {formData.feeForNoShow === "Ja" && renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number")}
+          {formData.feeForNoShow === "Ja" &&
+            renderField("noShowFee", `Wie hoch ist die No-Show-Gebühr pro Gast (${currency})?`, "number", null, {
+              min: 0,
+              inputMode: "numeric",
+            })}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setStep(2);
-                afterStepChangeScroll();
-              }}
-              style={S.btnSecondary}
-            >
+            <button type="button" onClick={() => (setStep(2), afterStepChangeScroll())} style={S.btnSecondary}>
               Zurück
             </button>
-
             <button type="button" onClick={goFromStep3} style={S.btnPrimary}>
               Auswertung anzeigen
             </button>
@@ -905,9 +914,9 @@ export default function NoShowCalculator() {
             <form
               ref={contactFormRef}
               onSubmit={handleSubmit}
-              style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18 }}
+              style={{ marginTop: 22, borderTop: "1px solid #e5e7eb", paddingTop: 18, width: "100%", boxSizing: "border-box" }}
             >
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, width: "100%" }}>
                 <input name="firstName" value={formData.firstName} onChange={handleChange} placeholder="Vorname" style={S.input(false)} required />
                 <input name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Nachname" style={S.input(false)} required />
               </div>
@@ -925,7 +934,7 @@ export default function NoShowCalculator() {
 
               <div style={{ height: 12 }} />
 
-              <div>
+              <div style={{ width: "100%" }}>
                 <input
                   name="email"
                   value={formData.email}
