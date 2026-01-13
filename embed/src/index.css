@@ -1,255 +1,204 @@
-/* embed/src/index.css */
-@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap");
 
-/* -----------------------------
-   Base / Reset (Shadow scoped)
------------------------------- */
-:host,
-#ns-mount {
-  font-family: Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
-    "Apple Color Emoji", "Segoe UI Emoji";
-  font-size: 16px; /* verhindert Mobile-Input-Zoom */
-  line-height: 1.4;
-  color: #111827;
+/* =========================
+   Embed base reset (Shadow)
+   ========================= */
+:host {
+  --ns-pink: #fe4497;
+  --ns-pink-2: #ec4899;
+  --ns-gray-900: #111827;
+  --ns-gray-700: #374151;
+  --ns-gray-600: #4b5563;
+  --ns-gray-500: #6b7280;
+  --ns-border: #d1d5db;
+
+  font-family: Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  color: var(--ns-gray-900);
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
 }
 
-/* ein bisschen “Layout-Sicherheit” im Shadow */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-a {
-  color: inherit;
+img,
+svg {
+  max-width: 100%;
+  height: auto;
 }
 
-/* -----------------------------
-   Typo (Headline wie auf LP)
------------------------------- */
-h2 {
-  /* “Hero-ish” – responsiv, ähnlich euren Landing Headings */
-  font-size: clamp(32px, 3.2vw, 52px);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  font-weight: 800;
-  margin: 0 0 0.5rem 0;
-}
-
-h3 {
-  font-weight: 700;
-}
-
-p {
-  margin: 0.25rem 0;
-  color: #374151;
-}
-
-/* Step-Label “Schritt X von Y” */
-.ns-stepmeta {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-/* -----------------------------
-   Form Controls (HubSpot-safe)
------------------------------- */
-label {
-  display: block;
-  margin: 0 0 6px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #111827;
-}
-
+/* iOS/Android Zoom prevention */
 input,
 select,
-textarea {
-  font: inherit;
+textarea,
+button {
+  font-family: inherit;
   font-size: 16px;
-  line-height: 1.25;
-  padding: 10px 12px;
+}
+
+/* =========================
+   Form controls
+   ========================= */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+select,
+textarea {
   width: 100%;
   border-radius: 10px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--ns-border);
   background: #fff;
-  color: #111827;
+  color: inherit;
+  padding: 10px 12px;
+  line-height: 1.25;
   outline: none;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #ec4899;
-  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+  border-color: rgba(254, 68, 151, 0.55);
+  box-shadow: 0 0 0 3px rgba(254, 68, 151, 0.15);
 }
 
-/* Fehlerzustand */
-.ns-error {
-  border-color: #ec4899 !important;
-}
-
-.ns-error-text {
-  color: #ec4899;
-  font-size: 12px;
-  margin-top: 6px;
-}
-
-/* -----------------------------
-   Buttons (aleno pink)
------------------------------- */
+/* =========================
+   Buttons (embed scoped)
+   ========================= */
 button {
-  font-family: Poppins, sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
-
-  background-color: #fe4497;
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0);
-  border-radius: 36px;
-  padding: 1rem 3.125rem;
-
-  cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease,
-    transform 150ms ease;
-}
-
-button:hover {
-  background-color: #fff;
-  border-color: #fe4497;
-  color: #fe4497;
-}
-
-button:active {
-  transform: translateY(1px);
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* kleinere Secondary Buttons */
-.ns-btn-secondary {
-  background: #e5e7eb;
-  color: #111827;
-  border-color: transparent;
-  text-transform: none;
-  padding: 0.6rem 1.1rem;
+  border: 2px solid transparent;
   border-radius: 999px;
-}
-.ns-btn-secondary:hover {
-  background: #d1d5db;
-  color: #111827;
-  border-color: transparent;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-/* -----------------------------
-   Progress Bar (falls Tailwind mal zickt)
------------------------------- */
-.ns-progress-wrap {
+button.ns-btn-primary {
+  background: var(--ns-pink);
+  color: #fff;
+  padding: 14px 38px;
+}
+
+button.ns-btn-primary:hover {
+  background: #fff;
+  color: var(--ns-pink);
+  border-color: var(--ns-pink);
+}
+
+button.ns-btn-secondary {
+  background: #e5e7eb;
+  color: var(--ns-gray-900);
+  padding: 10px 18px;
+}
+
+button.ns-btn-green {
+  background: #16a34a;
+  color: #fff;
+  padding: 10px 18px;
+}
+
+/* =========================
+   Progress bar
+   ========================= */
+.ns-progress-track {
   width: 100%;
   height: 8px;
   background: #e5e7eb;
   border-radius: 999px;
   overflow: hidden;
 }
-.ns-progress-bar {
+
+.ns-progress-fill {
   height: 100%;
-  background: #ec4899;
-  width: 0%;
+  background: var(--ns-pink-2);
+  transition: width 250ms ease;
 }
 
-/* -----------------------------
-   Keyboard safe padding helper
------------------------------- */
-.kb-safe {
-  padding-bottom: calc(var(--kb, 0px) + 24px);
-}
-
-/* -----------------------------
-   Slider (dünner wie Vercel)
------------------------------- */
-input[type="range"].pink-slider {
+/* =========================
+   Pink slider (thin)
+   ========================= */
+.pink-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 6px;                 /* <-- dünner */
+  height: 4px;              /* ✅ dünner */
   border-radius: 999px;
-  background: #f9a8d4;         /* light pink track */
+  background: rgba(254, 68, 151, 0.35);
   outline: none;
-  cursor: pointer;
-  position: relative;
 }
 
-/* Track */
-input[type="range"].pink-slider::-webkit-slider-runnable-track {
-  height: 6px;                 /* <-- dünner */
+/* Webkit track */
+.pink-slider::-webkit-slider-runnable-track {
+  height: 4px;              /* ✅ dünner */
   border-radius: 999px;
-  background: #f9a8d4;
+  background: rgba(254, 68, 151, 0.35);
 }
 
-/* Thumb */
-input[type="range"].pink-slider::-webkit-slider-thumb {
+/* Webkit thumb */
+.pink-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;                 /* minimal kleiner */
-  height: 20px;
+  width: 18px;              /* ✅ kleiner */
+  height: 18px;             /* ✅ kleiner */
   border-radius: 999px;
-  background: #ec4899;
+  background: var(--ns-pink-2);
   border: 3px solid #fff;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-  margin-top: -7px;            /* zentriert auf 6px Track */
-  position: relative;
-  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  margin-top: -7px;         /* ✅ passend zur Track-Höhe */
+  cursor: pointer;
 }
 
-input[type="range"].pink-slider::-moz-range-track {
-  height: 6px;
+/* Firefox */
+.pink-slider::-moz-range-track {
+  height: 4px;
   border-radius: 999px;
-  background: #f9a8d4;
+  background: rgba(254, 68, 151, 0.35);
 }
 
-input[type="range"].pink-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+.pink-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  background: #ec4899;
+  background: var(--ns-pink-2);
   border: 3px solid #fff;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
 }
 
-/* Value-Bubble über Slider */
-.ns-slider-bubble {
-  position: absolute;
-  top: -18px;
-  transform: translateX(-50%);
+/* =========================
+   Cards / KPIs
+   ========================= */
+.ns-card {
+  background: #111;
+  color: #fff;
+  border-radius: 16px;
+  padding: 22px;
+  text-align: center;
+}
+
+.ns-card-title {
   font-size: 12px;
-  font-weight: 700;
-  color: #ec4899;
-  white-space: nowrap;
+  opacity: 0.9;
+  margin: 0 0 6px 0;
 }
 
-/* -----------------------------
-   Kleine Layout-Helpers
------------------------------- */
-.ns-field {
-  margin-bottom: 28px;
+.ns-card-value {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0;
+  color: #fff;              /* ✅ KPI immer weiß */
 }
 
-.ns-help {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 6px;
-}
-
-.ns-grid-2 {
-  display: grid;
-  gap: 16px;
-}
+/* =========================
+   Responsive helpers
+   ========================= */
 @media (min-width: 640px) {
   .ns-grid-2 {
+    display: grid;
     grid-template-columns: 1fr 1fr;
+    gap: 14px;
   }
 }
