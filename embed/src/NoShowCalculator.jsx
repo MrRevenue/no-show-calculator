@@ -124,28 +124,18 @@ export default function NoShowCalculator() {
 
   const stabilizeRangeStart = useCallback(() => {
     try {
-      // 1) Merke aktuellen window.scrollY
       const startScroll = window.scrollY;
 
-      // 2) Tastatur schließen, falls ein Textfeld offen ist
       blurTextInputIfAny();
 
-      // 3) Einmalige, einfache Wiederherstellung auf exakt denselben Scroll-Stand
-      requestAnimationFrame(() => {
+      // nur einmal, etwas später
+      setTimeout(() => {
         try {
           window.scrollTo({ top: startScroll, behavior: "auto" });
         } catch {}
-      });
-
-    // Optional: ein kurzer zweiter Versuch, falls nötig
-    setTimeout(() => {
-      try {
-        window.scrollTo({ top: startScroll, behavior: "auto" });
-      } catch {}
-    }, 60);
+      }, 100); // statt 0 oder 60
     } catch {}
   }, []);
-
 
   // ------------------------------------------------------------
   // Fix #2: Anchor/CTA Klick im Hero abfangen (#no-show-calculator)
