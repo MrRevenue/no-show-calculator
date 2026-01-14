@@ -85,6 +85,17 @@ export default function NoShowCalculator() {
     } catch {}
   }, []);
 
+  const isKeyboardOpen = () => {
+    try {
+      const vv = window.visualViewport;
+      if (!vv) return false;
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      return kb > 0;
+    } catch {
+      return false;
+    }
+  };
+  
   // ------------------------------------------------------------
   // Keyboard / VisualViewport -> --kb Padding (nur Layout, kein Blur!)
   // ------------------------------------------------------------
@@ -124,18 +135,51 @@ export default function NoShowCalculator() {
 
   const stabilizeRangeStart = useCallback(() => {
     try {
-      const startScroll = window.scrollY;
+      // Nur reagieren, wenn wirklich Keyboard offen ist (sonst unnötig)
+      if (!isKeyboardOpen()) return;
 
+      const scrollY = window.scrollY || 0;
+
+      // Scroll "einfrieren": Body auf fixed setzen
+      const body = document.body;
+      const html = document.documentElement;
+
+      const prevBodyPosition = body.style.position;
+      const prevBodyTop = body.style.top;
+      const prevBodyLeft = body.style.left;
+      const prevBodyRight = body.style.right;
+      const prevBodyWidth = body.style.width;
+
+      const prevHtmlScrollBehavior = html.style.scrollBehavior;
+
+      // wichtig: kein smooth während wir restaurieren
+      html.style.scrollBehavior = "auto";
+
+      body.style.position = "fixed";
+      body.style.top = `-${scrollY}px`;
+      body.style.left = "0";
+      body.style.right = "0";
+      body.style.width = "100%";
+
+      // Keyboard schließen
       blurTextInputIfAny();
 
-      // nur einmal, etwas später
+      // Nach kurzer Zeit wieder freigeben + exakt auf alte Position
       setTimeout(() => {
         try {
-          window.scrollTo({ top: startScroll, behavior: "auto" });
+          body.style.position = prevBodyPosition;
+          body.style.top = prevBodyTop;
+          body.style.left = prevBodyLeft;
+          body.style.right = prevBodyRight;
+          body.style.width = prevBodyWidth;
+
+          window.scrollTo({ top: scrollY, behavior: "auto" });
+
+          html.style.scrollBehavior = prevHtmlScrollBehavior;
         } catch {}
-      }, 100); // statt 0 oder 60
-    } catch {}
-  }, []);
+      }, 120); // <- wenn noch minimaler Jump: 160 testen
+      } catch {}
+  }, [blurTextInputIfAny]);
 
   // ------------------------------------------------------------
   // Fix #2: Anchor/CTA Klick im Hero abfangen (#no-show-calculator)
