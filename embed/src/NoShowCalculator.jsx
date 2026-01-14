@@ -124,27 +124,28 @@ export default function NoShowCalculator() {
 
   const stabilizeRangeStart = useCallback(() => {
     try {
-      const vv = window.visualViewport;
-      const { scrollY, visualOffsetTop } = getCurrentViewportPositions();
+      // 1) Merke aktuellen window.scrollY
+      const startScroll = window.scrollY;
 
-      // Keyboard schließen (nur wenn gerade ein Textinput fokussiert ist)
+      // 2) Tastatur schließen, falls ein Textfeld offen ist
       blurTextInputIfAny();
 
-      const restore = () => {
+      // 3) Einmalige, einfache Wiederherstellung auf exakt denselben Scroll-Stand
+      requestAnimationFrame(() => {
         try {
-          const nowOffset = vv ? vv.offsetTop : 0;
-          const diff = nowOffset - visualOffsetTop;
-          window.scrollTo({ top: scrollY + diff, behavior: "auto" });
+          window.scrollTo({ top: startScroll, behavior: "auto" });
         } catch {}
-      };
+      });
 
-      // Mehrere Versuche, weil Chrome den Offset oft verzögert updated
-      requestAnimationFrame(restore);
-      setTimeout(restore, 60);
-      setTimeout(restore, 140);
-      setTimeout(restore, 220);
+    // Optional: ein kurzer zweiter Versuch, falls nötig
+    setTimeout(() => {
+      try {
+        window.scrollTo({ top: startScroll, behavior: "auto" });
+      } catch {}
+    }, 60);
     } catch {}
-  }, [blurTextInputIfAny]);
+  }, []);
+
 
   // ------------------------------------------------------------
   // Fix #2: Anchor/CTA Klick im Hero abfangen (#no-show-calculator)
